@@ -47,7 +47,9 @@ def fetch_power_daily(lat, lon, start="19810101", end="20241231"):
     df = pd.DataFrame(data["properties"]["parameter"])
     df.index = pd.to_datetime(df.index, format="%Y%m%d")
     df.index.name = "date"
-    return df.replace(FILL_VALUE, float("nan"))
+    df = df.replace(FILL_VALUE, float("nan"))
+    df.attrs["elevation_m"] = data["geometry"]["coordinates"][2]
+    return df
 
 
 if __name__ == "__main__":

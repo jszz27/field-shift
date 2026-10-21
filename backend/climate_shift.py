@@ -6,6 +6,7 @@ are split at July 1.
 """
 import pandas as pd
 
+from et0 import daily_et0
 from power_client import fetch_power_daily
 
 THEN = (1981, 2000)
@@ -43,7 +44,7 @@ def longest_dry_spell(precip):
     return int(dry.groupby(run_id).sum().max())
 
 
-def yearly_indicators(df):
+def yearly_indicators(df, lat_deg):
     """One row per year with every indicator."""
     year = df.index.year
     season = df[df.index.month.isin(GROWING_SEASON_MONTHS)]
@@ -54,6 +55,8 @@ def yearly_indicators(df):
         "heat_stress_days": (df["T2M_MAX"] > HEAT_STRESS_TEMP).groupby(year).sum(),
         "season_rain": season["PRECTOTCORR"].groupby(season_year).sum(),
         "longest_dry_spell": season["PRECTOTCORR"].groupby(season_year).apply(longest_dry_spell),
+        # Annual total; years with missing days (solar data starts 1984) stay empty
+        "et0": daily_et0(df, lat_deg).groupby(year).sum(min_count=365),
     })
     yearly = yearly.join(frost_dates(df["T2M_MIN"]))
     yearly["frost_free_days"] = yearly["first_fall_frost"] - yearly["last_spring_frost"] - 1
@@ -79,8 +82,9 @@ def day_of_year_to_date(doy):
 
 if __name__ == "__main__":
     # Ames, Iowa: the primary demo location
-    df = fetch_power_daily(42.03, -93.62)
-    table = compare_periods(yearly_indicators(df))
+    lat = 42.03
+    df = fetch_power_daily(lat, -93.62)
+    table = compare_periods(yearly_indicators(df, lat))
     print(f"\nClimate shift, Ames IA: {THEN[0]}-{THEN[1]} vs {NOW[0]}-{NOW[1]}\n")
     print(table.round(1).to_string())
     for col in ("last_spring_frost", "first_fall_frost"):
