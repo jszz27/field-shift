@@ -421,9 +421,10 @@ def score_rotation(lat, lon, pack_id, baseline, rotation, covers=None, weights=N
     r["rule_breaks"] = check(tuple(rotation), site["crops"], site["pack"])
     r["reasons"] = explain(r, base, site)
     better = [x for x in scored[:-1] if x["final"] is not None and r["final"] is not None and x["final"] > r["final"]]
+    ranked = r["final"] is not None and not r["rule_breaks"]  # a rotation that breaks a rule is scored, not ranked
     return {"zone": site["zone"], "pack": site["pack"], "soil": site["soil"], "baseline": base,
             "ranked_on": indicators, "rotation": r,
-            "rank": None if r["final"] is None else len(better) + 1,
+            "rank": len(better) + 1 if ranked else None,
             "n_comparable": sum(x["final"] is not None for x in scored[:-1]), "site": site}
 
 

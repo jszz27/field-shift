@@ -83,6 +83,7 @@ def test_score_user_rotation(client):
 def test_score_reports_rule_breaks(client):
     body = client.post("/api/score", json={**AMES, "baseline": ["maize"], "rotation": ["maize", "maize", "soybean"]}).json()
     assert any(b.startswith("repeat") for b in body["rotation"]["rule_breaks"])
+    assert body["rank"] is None and body["rotation"]["final"] is not None   # scored, but not ranked
 
 
 @pytest.mark.parametrize("path, req, status", [

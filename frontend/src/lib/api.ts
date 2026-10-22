@@ -36,6 +36,18 @@ export type ScoredRotation = {
   reasons?: string[];
   skipped: Record<string, string>;
   assumed_timing: string[];
+  rule_breaks?: string[];
+};
+
+export type ScoreRequest = RecommendRequest & { rotation: string[] };
+
+export type ScoreResponse = {
+  pack: string;
+  ranked_on: string[];
+  baseline: ScoredRotation;
+  rotation: ScoredRotation;
+  rank: number | null;
+  n_comparable: number;
 };
 
 export type RecommendResponse = {
@@ -95,10 +107,10 @@ export const api = {
   climateShift: (p: Point) => request<ClimateShiftResponse>(`/api/climate-shift?${query(p)}`),
   soil: (p: Point) => request<SoilResponse>(`/api/soil?${query(p)}`),
   crops: (p: Point) => request<CropsResponse>(`/api/crops?${query(p)}`),
-  recommend: (req: RecommendRequest) =>
-    request<RecommendResponse>("/api/recommend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req),
-    }),
+  recommend: (req: RecommendRequest) => post<RecommendResponse>("/api/recommend", req),
+  score: (req: ScoreRequest) => post<ScoreResponse>("/api/score", req),
 };
+
+function post<T>(path: string, body: unknown) {
+  return request<T>(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+}

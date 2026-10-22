@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from "react";
 import {
-  api, type CropsResponse, type Point, type RecommendResponse, type SoilInput, type SoilResponse, type Weights,
+  api, type Crop, type CropsResponse, type Point, type RecommendRequest, type RecommendResponse, type SoilInput,
+  type SoilResponse, type Weights,
 } from "@/lib/api";
+
+// What the results view needs to show rankings and re-score user edits
+export type Recommendation = { request: RecommendRequest; response: RecommendResponse; crops: Crop[] };
 
 const MAX_YEARS = 5;
 
@@ -27,7 +31,9 @@ function Problem({ message }: { message: string }) {
   return <p className="rounded-md bg-red-50 p-2 text-sm text-red-800">{message}</p>;
 }
 
-export default function InputsPanel({ point }: { point: Point }) {
+type Props = { point: Point; onResult: (result: Recommendation) => void };
+
+export default function InputsPanel({ point, onResult }: Props) {
   const [soil, setSoil] = useState<SoilResponse | null>(null);
   const [soilError, setSoilError] = useState<string | null>(null);
   const [manualTexture, setManualTexture] = useState("");
@@ -35,7 +41,6 @@ export default function InputsPanel({ point }: { point: Point }) {
   const [cropsError, setCropsError] = useState<string | null>(null);
   const [baseline, setBaseline] = useState<string[]>([]);
   const [weights, setWeights] = useState<Weights>({ soil_health: 50, water: 50, stability: 50, simplicity: 50 });
-  const [result, setResult] = useState<RecommendResponse | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -67,7 +72,8 @@ export default function InputsPanel({ point }: { point: Point }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      setResult(await api.recommend({ ...point, baseline, soil: soilInput, weights }));
+      const request = { ...point, baseline, soil: soilInput, weights };
+      onResult({ request, response: await api.recommend(request), crops: crops?.crops ?? [] });
     } catch (e) {
       setSubmitError((e as Error).message);
     } finally {
@@ -188,23 +194,6 @@ export default function InputsPanel({ point }: { point: Point }) {
         {submitting ? "Scoring rotations…" : "Get recommendations"}
       </button>
       {submitError && <Problem message={submitError} />}
-
-      {result && (
-        <Section title="Top rotations">
-          <p className="text-xs text-zinc-500">
-            Current practice ({result.baseline.label}): {result.baseline.final}. {result.n_comparable} of{" "}
-            {result.n_valid} rotations could be compared.
-          </p>
-          <ol className="mt-2 flex flex-col gap-1 text-sm">
-            {result.rotations.map((r) => (
-              <li key={r.rotation.join("-")} className="flex justify-between gap-2">
-                <span>{r.label}</span>
-                <span className="tabular-nums font-medium">{r.final}</span>
-              </li>
-            ))}
-          </ol>
-        </Section>
-      )}
     </div>
   );
 }
