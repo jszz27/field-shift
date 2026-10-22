@@ -201,6 +201,52 @@ def compare_periods(yearly):
 
 DATE_ROWS = ["last_spring_frost", "first_fall_frost", "rain_onset", "rain_end"]
 
+# Unit and plain-language label per indicator, for the takeaways
+LABELS = {
+    "gdd": ("°C-days", "Growing heat (GDD) per year"),
+    "heat_stress_days": ("days", "Days above 35 °C per year"),
+    "season_rain": ("mm", "Rain in the growing season"),
+    "season_rain_cv": ("%", "Year-to-year variability of that rain"),
+    "longest_dry_spell": ("days", "Longest dry spell in the season"),
+    "et0": ("mm", "Water demand from the air (ET0) per year"),
+    "gwetroot": ("0-1", "Root-zone soil wetness (0 dry, 1 saturated)"),
+    "last_spring_frost": ("date", "Last spring frost"),
+    "first_fall_frost": ("date", "First fall frost"),
+    "frost_free_days": ("days", "Frost-free season"),
+    "rain_onset": ("date", "Rainy season starts"),
+    "rain_end": ("date", "Rainy season ends"),
+    "season_length": ("days", "Rainy season length"),
+    "n_seasons": ("seasons", "Rainy seasons per year"),
+}
+
+
+def takeaways(table):
+    """One record per indicator: then, now, change and a plain-language sentence."""
+    year_start = table.attrs["year_start"]
+    period = f"{THEN[0]}-{THEN[1]} vs {NOW[0]}-{NOW[1]}"
+    records = []
+    for name, (unit, label) in LABELS.items():
+        if name not in table.index:
+            continue
+        then, now, change = (float(v) for v in table.loc[name, ["then", "now", "change"]])
+        if unit == "date":
+            shown = (day_of_season_to_date(then, year_start), day_of_season_to_date(now, year_start))
+            days = round(now) - round(then)  # matches the dates shown
+            direction = "earlier" if days < 0 else "later"
+            text = f"{label}: {shown[0]} -> {shown[1]} ({abs(days)} days {direction}, {period})."
+        else:
+            digits = 2 if unit == "0-1" else 1 if abs(now) < 20 else 0
+            shown = (f"{then:.{digits}f}", f"{now:.{digits}f}")
+            if unit == "%":
+                text = f"{label}: {shown[0]}% -> {shown[1]}% ({period})."
+            else:
+                suffix = "" if unit == "0-1" else f" {unit}"
+                pct = f", {change / then * 100:+.0f}%" if then and unit != "0-1" else ""
+                text = f"{label}: {shown[0]} -> {shown[1]}{suffix}{pct} ({period})."
+        records.append({"indicator": name, "unit": unit, "then": then, "now": now, "change": change,
+                        "then_display": shown[0], "now_display": shown[1], "text": text})
+    return records
+
 if __name__ == "__main__":
     sites = [
         ("Ames, IA", 42.03, -93.62),

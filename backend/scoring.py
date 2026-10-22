@@ -32,7 +32,9 @@ from climate_shift import NOW, compare_periods, day_of_season_to_date, yearly_in
 from crops import crops_for_pack
 from et0 import daily_et0
 from power_client import fetch_power_daily
-from rotations import day_of_year, fall_planted, generate, typical_harvest
+import snapshots
+from crops import load as load_crops
+from rotations import check, cover_options, day_of_year, fall_planted, generate, typical_harvest
 from soil_client import get_soil
 
 RESIDUE_WEIGHT = {"high": 0.5, "medium": 0.25, "low": 0.0}  # team assumption: residue counts half at most
@@ -45,6 +47,8 @@ GROUPS = {
 HIGHER_IS_BETTER = {"water_demand": False, "n_balance": False, "soil_cover": True, "yield_loss_pct": False,
                     "heat_days": False, "diversity": True, "simplicity": False}
 STAGES = ("ini", "dev", "mid", "late")
+# Pack used when the request names none and the point is not a demo site
+ZONE_PACK = {"north_temperate": "us_midwest", "south_temperate": "south_temperate", "tropical": "semi_arid_tropics"}
 
 
 def mid(value):
@@ -85,10 +89,22 @@ def water_balance(rain, etc, taw, p):
     return gap, eta
 
 
-def site_context(lat, lon, pack_id, soil=None):
+def default_pack(lat, lon, zone):
+    """The demo site's pack if the point is one, else the zone's default pack."""
+    site_id = snapshots.site_for(lat, lon)
+    for site in snapshots.load_sites()["sites"]:
+        if site["id"] == site_id:
+            return site["crop_pack"]
+    return ZONE_PACK[zone]
+
+
+def site_context(lat, lon, pack_id=None, soil=None):
     df = fetch_power_daily(lat, lon)
     yearly = yearly_indicators(df, lat)
     table = compare_periods(yearly)
+    pack_id = pack_id or default_pack(lat, lon, table.attrs["zone"])
+    if pack_id not in load_crops()["packs"]:
+        raise ValueError(f"Unknown crop pack {pack_id!r}")
     soil = soil or get_soil(lat, lon)
     if soil is None:
         raise ValueError("No soil data for this point: pass a manual soil profile")
@@ -266,7 +282,7 @@ def final_score(scores, weights, indicators):
         if known and weights.get(group, 0) > 0:
             total += weights[group] * np.mean(known)
             weight_sum += weights[group]
-    return round(total / weight_sum, 1) if weight_sum else None
+    return float(round(total / weight_sum, 1)) if weight_sum else None
 
 
 def describe(seq, crops):
@@ -345,26 +361,70 @@ def evaluate(site, rotation, covers):
             "assumed_timing": assumed}
 
 
-def recommend(lat, lon, pack_id, baseline, weights=None, soil=None, top=5):
+def first_fall_frost(site):
+    return None if site["zone"] == "tropical" else round(site["table"].loc["first_fall_frost", "now"])
+
+
+def candidates(site, years=None):
+    """Valid rotations for the site's pack as (rotation, covers), using the first cover crop that fits."""
+    return [(list(c["rotation"]), [opts[0] if opts else None for opts in c["covers"]])
+            for c in generate(site["pack"], first_fall_frost(site))["valid"]
+            if not years or len(c["rotation"]) in years]
+
+
+def check_crops(site, seq):
+    unknown = [c for c in seq if c not in site["crops"] or site["crops"][c]["type"] == "cover"]
+    if unknown:
+        raise ValueError(f"Not cash crops in pack {site['pack']}: {', '.join(unknown)}")
+
+
+def score_against_baseline(site, baseline, weights, rotations):
+    """Score the baseline and [(rotation, covers)] as one set. Final scores use only the
+    indicators scored for the baseline; rotations missing one of them get final None."""
+    check_crops(site, baseline)
+    base = evaluate(site, baseline, [None] * len(baseline))
+    scored = [evaluate(site, rotation, covers) for rotation, covers in rotations]
+    score_set([base] + scored)
+    indicators = {k for k, v in base["scores"].items() if v is not None}
+    for r in [base] + scored:
+        comparable = all(r["scores"][k] is not None for k in indicators)
+        r["final"] = final_score(r["scores"], weights, indicators) if comparable else None
+    return base, scored, sorted(indicators)
+
+
+def recommend(lat, lon, pack_id, baseline, weights=None, soil=None, top=5, years=None):
     """Rank every valid rotation for the site against the farmer's baseline."""
     weights = weights or {group: 1.0 for group in GROUPS}
     site = site_context(lat, lon, pack_id, soil)
-    frost = None if site["zone"] == "tropical" else round(site["table"].loc["first_fall_frost", "now"])
-    candidates = generate(pack_id, frost)["valid"]
-    base = evaluate(site, baseline, [None] * len(baseline))
-    rotations = [evaluate(site, c["rotation"], [opts[0] if opts else None for opts in c["covers"]])
-                 for c in candidates]
-    score_set([base] + rotations)
-    indicators = {k for k, v in base["scores"].items() if v is not None}
-    comparable = [r for r in rotations if all(r["scores"][k] is not None for k in indicators)]
-    for r in [base] + comparable:
-        r["final"] = final_score(r["scores"], weights, indicators)
+    base, scored, indicators = score_against_baseline(site, baseline, weights, candidates(site, years))
+    comparable = [r for r in scored if r["final"] is not None]
     ranked = sorted(comparable, key=lambda r: r["final"], reverse=True)[:top]
     for r in ranked:
         r["reasons"] = explain(r, base, site)
-    return {"zone": site["zone"], "pack": pack_id, "soil": site["soil"], "baseline": base,
-            "ranked_on": sorted(indicators), "n_valid": len(rotations), "n_comparable": len(comparable),
+    return {"zone": site["zone"], "pack": site["pack"], "soil": site["soil"], "baseline": base,
+            "ranked_on": indicators, "n_valid": len(scored), "n_comparable": len(comparable),
             "rotations": ranked, "site": site}
+
+
+def score_rotation(lat, lon, pack_id, baseline, rotation, covers=None, weights=None, soil=None, years=None):
+    """Score a user-edited rotation within the same set as recommend(), so the numbers compare."""
+    weights = weights or {group: 1.0 for group in GROUPS}
+    site = site_context(lat, lon, pack_id, soil)
+    check_crops(site, rotation)
+    if covers is None:
+        frost, crops = first_fall_frost(site), site["crops"]
+        covers = [next(iter(cover_options(a, b, crops, site["pack"], frost)), None)
+                  for a, b in zip(rotation, rotation[1:] + rotation[:1])]
+    valid = candidates(site, years)
+    base, scored, indicators = score_against_baseline(site, baseline, weights, valid + [(rotation, covers)])
+    r = scored[-1]
+    r["rule_breaks"] = check(tuple(rotation), site["crops"], site["pack"])
+    r["reasons"] = explain(r, base, site)
+    better = [x for x in scored[:-1] if x["final"] is not None and r["final"] is not None and x["final"] > r["final"]]
+    return {"zone": site["zone"], "pack": site["pack"], "soil": site["soil"], "baseline": base,
+            "ranked_on": indicators, "rotation": r,
+            "rank": None if r["final"] is None else len(better) + 1,
+            "n_comparable": sum(x["final"] is not None for x in scored[:-1]), "site": site}
 
 
 def show(title, result):
