@@ -82,8 +82,8 @@ def check(seq, crops, region):
 def cover_options(a_id, b_id, crops, region, first_fall_frost):
     """Cover crops that fit the gap after crop a, when b is planted the next spring."""
     a, b = crops[a_id], crops[b_id]
-    if a_id == b_id or fall_planted(b, region):
-        return []  # inside a perennial stand, or no fall-to-spring gap
+    if a_id == b_id or first_fall_frost is None or fall_planted(b, region):
+        return []  # inside a perennial stand, no frost (tropical pack), or no fall-to-spring gap
     harvest = typical_harvest(a, region)
     return [c["id"] for c in crops.values()
             if c["type"] == "cover" and c["cover"]["min_days_before_first_frost"] is not None

@@ -411,8 +411,15 @@
         },
         "cowpea": {
           "plant_after": null,
-          "plant_note": "Main Sahel legume, added for the Niamey demo; no sowing-window source yet.",
+          "plant_note": "Main Sahel legume, added for the Niamey demo; no sowing-window source yet. Scoring plants it at onset and flags the timing as assumed.",
           "stage_days": {"ini": 20, "dev": 30, "mid": 30, "late": 20}, "stage_note": "FAO-56 Table 11 green gram/cowpeas, March, Mediterranean (only row)",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"stage_days": "fao56_t11"}
+        },
+        "maize": {
+          "plant_after": null,
+          "plant_note": "Added as the maize-heavy comparison for the semi-arid demo; no sowing-window source yet. Scoring plants it at onset and flags the timing as assumed.",
+          "stage_days": {"ini": 20, "dev": 35, "mid": 40, "late": 30}, "stage_note": "FAO-56 Table 11 maize (grain), June, Nigeria (rainy-season row)",
           "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
           "sources": {"stage_days": "fao56_t11"}
         }

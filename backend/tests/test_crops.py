@@ -22,7 +22,7 @@ def test_real_file_is_valid(data):
 
 @pytest.mark.parametrize("pack, expected", [
     ("us_midwest", {"maize", "soybean", "winter_wheat", "oats", "alfalfa", "cereal_rye", "crimson_clover", "radish"}),
-    ("semi_arid_tropics", {"sorghum", "pearl_millet", "chickpea", "pigeon_pea", "groundnut", "cowpea"}),
+    ("semi_arid_tropics", {"sorghum", "pearl_millet", "chickpea", "pigeon_pea", "groundnut", "cowpea", "maize"}),
     ("humid_tropics", {"rice", "maize", "cassava", "cowpea"}),
     ("south_temperate", {"soybean", "maize", "winter_wheat"}),
 ])
