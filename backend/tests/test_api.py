@@ -19,12 +19,19 @@ def test_climate_shift(client):
     rows = {r["indicator"]: r for r in body["indicators"]}
     assert rows["frost_free_days"]["then_display"] == "168" and rows["frost_free_days"]["now_display"] == "179"
     assert "Oct 19" in rows["first_fall_frost"]["text"]
+    assert rows["first_fall_frost"]["direction"] == "up" and "cover crop" in rows["first_fall_frost"]["meaning"]
 
 
 def test_climate_shift_tropical_has_rainy_season_not_frost(client):
     rows = {r["indicator"] for r in client.get("/api/climate-shift", params=NIAMEY).json()["indicators"]}
     assert {"rain_onset", "rain_end", "season_length"} <= rows
     assert "first_fall_frost" not in rows and "gdd" not in rows
+
+
+def test_small_changes_read_as_little_change(client):
+    rows = {r["indicator"]: r for r in client.get("/api/climate-shift", params=NIAMEY).json()["indicators"]}
+    assert rows["heat_stress_days"]["direction"] == "same"      # 202 -> 198 days
+    assert rows["heat_stress_days"]["meaning"] == "Little change."
 
 
 def test_soil(client):

@@ -220,8 +220,38 @@ LABELS = {
 }
 
 
+# What a rise / fall means for a farmer (neutral: whether it helps depends on the crop)
+MEANINGS = {
+    "gdd": ("More heat to ripen crops; longer-season varieties may fit.", "Less heat to ripen crops."),
+    "heat_stress_days": ("More days hot enough to hurt flowering and grain fill.", "Fewer extreme-heat days."),
+    "season_rain": ("Wetter growing seasons.", "Drier growing seasons: less water for crops without irrigation."),
+    "season_rain_cv": ("Rain is less predictable from one year to the next.", "Rain is more predictable from one year to the next."),
+    "longest_dry_spell": ("Longer dry breaks during the season raise drought stress.", "Shorter dry breaks during the season."),
+    "et0": ("The air pulls more water from crops and soil, so crops need more water.", "The air pulls less water from crops and soil."),
+    "gwetroot": ("Root zones are wetter.", "Root zones are drier."),
+    "last_spring_frost": ("Spring frost risk lasts longer, delaying planting.", "Planting can start earlier."),
+    "first_fall_frost": ("More time after harvest to establish a cover crop.", "Less time after harvest before frost."),
+    "frost_free_days": ("A longer growing season.", "A shorter growing season."),
+    "rain_onset": ("The rains start later, pushing planting back.", "The rains start earlier, so planting can start earlier."),
+    "rain_end": ("The rains last longer into the season.", "The rains end sooner."),
+    "season_length": ("A longer rainy season: more time for crops to finish.", "A shorter rainy season: crops have less time to finish."),
+    "n_seasons": ("Usable rainy seasons happen more often.", "Usable rainy seasons happen less often."),
+}
+
+
+def is_small(unit, then, change):
+    """Changes too small to call a shift."""
+    if unit == "date":
+        return abs(change) <= 2
+    if unit == "%":
+        return abs(change) < 2       # percentage points of rainfall variability
+    if unit == "0-1":
+        return abs(change) < 0.02
+    return not then or abs(change / then) < 0.03
+
+
 def takeaways(table):
-    """One record per indicator: then, now, change and a plain-language sentence."""
+    """One record per indicator: then, now, change, a sentence with the numbers and what it means."""
     year_start = table.attrs["year_start"]
     period = f"{THEN[0]}-{THEN[1]} vs {NOW[0]}-{NOW[1]}"
     records = []
@@ -243,8 +273,11 @@ def takeaways(table):
                 suffix = "" if unit == "0-1" else f" {unit}"
                 pct = f", {change / then * 100:+.0f}%" if then and unit != "0-1" else ""
                 text = f"{label}: {shown[0]} -> {shown[1]}{suffix}{pct} ({period})."
-        records.append({"indicator": name, "unit": unit, "then": then, "now": now, "change": change,
-                        "then_display": shown[0], "now_display": shown[1], "text": text})
+        direction = "same" if is_small(unit, then, change) else "up" if change > 0 else "down"
+        meaning = "Little change." if direction == "same" else MEANINGS[name][0 if direction == "up" else 1]
+        records.append({"indicator": name, "label": label, "unit": unit, "then": then, "now": now, "change": change,
+                        "then_display": shown[0], "now_display": shown[1], "direction": direction,
+                        "text": text, "meaning": meaning})
     return records
 
 if __name__ == "__main__":

@@ -1,7 +1,8 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { CircleMarker, MapContainer, TileLayer, useMapEvents } from "react-leaflet";
+import { useEffect } from "react";
+import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import type { Point } from "@/lib/api";
 
 type Props = {
@@ -19,6 +20,17 @@ function ClickToPick({ onPick }: { onPick: Props["onPick"] }) {
   return null;
 }
 
+// Leaflet only measures its container on load; redraw when the layout resizes it
+function FollowResize() {
+  const map = useMap();
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
 export default function MapPicker({ point, onPick }: Props) {
   return (
     <MapContainer center={[20, 0]} zoom={2} minZoom={2} worldCopyJump className="h-full w-full">
@@ -27,6 +39,7 @@ export default function MapPicker({ point, onPick }: Props) {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <ClickToPick onPick={onPick} />
+      <FollowResize />
       {point && (
         <CircleMarker
           center={[point.lat, point.lon]}

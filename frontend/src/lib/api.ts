@@ -49,7 +49,29 @@ export type RecommendResponse = {
   rotations: ScoredRotation[];
 };
 
-type ErrorBody = { detail?: string | { msg: string }[] };
+export type ClimateIndicator = {
+  indicator: string;
+  label: string;
+  unit: string;
+  then: number;
+  now: number;
+  change: number;
+  then_display: string;
+  now_display: string;
+  direction: "up" | "down" | "same";
+  text: string;
+  meaning: string;
+};
+
+export type ClimateShiftResponse = {
+  zone: "north_temperate" | "south_temperate" | "tropical";
+  periods: { then: [number, number]; now: [number, number] };
+  indicators: ClimateIndicator[];
+  source: string;
+  offline: boolean;
+};
+
+type ErrorBody ={ detail?: string | { msg: string }[] };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
@@ -70,6 +92,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const query = (p: Point) => `lat=${p.lat}&lon=${p.lon}`;
 
 export const api = {
+  climateShift: (p: Point) => request<ClimateShiftResponse>(`/api/climate-shift?${query(p)}`),
   soil: (p: Point) => request<SoilResponse>(`/api/soil?${query(p)}`),
   crops: (p: Point) => request<CropsResponse>(`/api/crops?${query(p)}`),
   recommend: (req: RecommendRequest) =>

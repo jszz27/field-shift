@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import type { Point } from "@/lib/api";
+import ClimateShiftPanel from "./ClimateShiftPanel";
 import InputsPanel from "./InputsPanel";
 
 // Leaflet touches `window`, so the map renders only in the browser
@@ -22,9 +23,19 @@ export default function FieldShiftApp() {
       </header>
 
       <main className="flex flex-1 flex-col lg:min-h-0 lg:flex-row">
-        <section className="h-[60vh] lg:h-auto lg:flex-1" aria-label="Map: click to choose a field">
-          <MapPicker point={point} onPick={setPoint} />
-        </section>
+        <div className="flex flex-col lg:min-h-0 lg:flex-1">
+          <section
+            className={point ? "h-[50vh] lg:h-[45%] lg:shrink-0" : "h-[60vh] lg:h-full"}
+            aria-label="Map: click to choose a field"
+          >
+            <MapPicker point={point} onPick={setPoint} />
+          </section>
+          {point && (
+            <section className="border-t border-zinc-200 lg:min-h-0 lg:flex-1 lg:overflow-y-auto" aria-label="Climate shift">
+              <ClimateShiftPanel key={`${point.lat},${point.lon}`} point={point} />
+            </section>
+          )}
+        </div>
 
         <aside className="w-full border-t border-zinc-200 bg-white p-4 sm:p-6 lg:w-96 lg:overflow-y-auto lg:border-l lg:border-t-0">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Your field</h2>
