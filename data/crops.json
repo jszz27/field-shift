@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "notes": [
+    "Every filled value names its source id in the crop's 'sources' map; fields still needing research are listed in 'todo' and set to null.",
+    "Season windows are USDA 'most active' planting/harvest spans (MM-DD). Crop 'year' in a rotation = its harvest year, so winter wheat is planted the fall before.",
+    "Kc ini values are FAO-56 Table 12 crop-group values (the per-crop column is an image on the FAO page).",
+    "Where FAO gives a range, it is kept as [low, high]; scoring (Step 8) decides which end applies."
+  ],
+  "sources": {
+    "fao56_t12": {"title": "FAO-56 Table 12: single crop coefficients Kc and maximum plant heights", "url": "https://www.fao.org/4/x0490e/x0490e0b.htm"},
+    "fao56_t22": {"title": "FAO-56 Table 22: maximum effective rooting depth Zr and depletion fraction p", "url": "https://www.fao.org/4/x0490e/x0490e0e.htm"},
+    "nass_2010": {"title": "USDA NASS, Field Crops Usual Planting and Harvesting Dates (Agricultural Handbook 628), Oct 2010", "url": "https://esmis.nal.usda.gov/concern/publications/vm40xr56k"},
+    "sare_ch6": {"title": "SARE, Cover Crops (R. Myers), Ch. 6: Simple Steps for Getting Started with Cover Crops", "url": "https://www.sare.org/publications/cover-crop-book/ch-6-simple-steps-for-getting-started-with-cover-crops/"},
+    "plan_4_2": {"title": "Field Shift plan.md §4.2 (team assumption, to be confirmed with an extension source)", "url": null},
+    "botany": {"title": "Botanical family (Poaceae = grass, Fabaceae = legume, Brassicaceae = brassica, Asteraceae = aster)", "url": null}
+  },
+  "crops": [
+    {
+      "id": "corn", "name": "Corn (grain)", "family": "grass", "type": "cash",
+      "season_windows": {
+        "iowa": {"plant": ["04-25", "05-18"], "harvest": ["10-05", "11-09"]},
+        "kansas": {"plant": ["04-15", "05-15"], "harvest": ["09-10", "10-25"]}
+      },
+      "kc": {"ini": 0.3, "mid": 1.20, "end": [0.35, 0.60]},
+      "max_height_m": 2,
+      "rooting_depth_m": [1.0, 1.7], "depletion_p": 0.55,
+      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
+      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+    },
+    {
+      "id": "soybean", "name": "Soybean", "family": "legume", "type": "cash",
+      "season_windows": {
+        "iowa": {"plant": ["05-08", "06-02"], "harvest": ["09-28", "10-20"]},
+        "kansas": {"plant": ["05-15", "06-20"], "harvest": ["10-01", "11-01"]}
+      },
+      "kc": {"ini": 0.4, "mid": 1.15, "end": 0.50},
+      "max_height_m": [0.5, 1.0],
+      "rooting_depth_m": [0.6, 1.3], "depletion_p": 0.50,
+      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
+      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+    },
+    {
+      "id": "winter_wheat", "name": "Winter wheat", "family": "grass", "type": "cash",
+      "season_windows": {
+        "iowa": {"plant": ["09-26", "10-15"], "harvest": ["07-06", "07-22"]},
+        "kansas": {"plant": ["09-15", "10-20"], "harvest": ["06-20", "07-05"]}
+      },
+      "kc": {"ini": 0.4, "mid": 1.15, "end": [0.25, 0.4]},
+      "kc_note": "FAO row 'Winter wheat, with frozen soils'",
+      "max_height_m": 1,
+      "rooting_depth_m": [1.5, 1.8], "depletion_p": 0.55,
+      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
+      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+    },
+    {
+      "id": "sorghum", "name": "Sorghum (grain)", "family": "grass", "type": "cash",
+      "season_windows": {
+        "kansas": {"plant": ["05-15", "06-20"], "harvest": ["09-25", "11-10"]}
+      },
+      "kc": {"ini": 0.3, "mid": [1.00, 1.10], "end": 0.55},
+      "max_height_m": [1, 2],
+      "rooting_depth_m": [1.0, 2.0], "depletion_p": 0.55,
+      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
+      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+    },
+    {
+      "id": "alfalfa", "name": "Alfalfa (hay)", "family": "legume", "type": "perennial",
+      "stand_years": [2, 3],
+      "season_windows": {
+        "iowa": {"plant": null, "harvest": ["05-30", "09-15"]},
+        "kansas": {"plant": null, "harvest": ["05-20", "10-15"]}
+      },
+      "season_note": "USDA lists cutting dates only; harvest window = cutting season. Treated as spring-seeded.",
+      "kc": {"ini": 0.40, "mid": 0.95, "end": 0.90},
+      "kc_note": "FAO row 'Alfalfa hay, averaged cutting effects'",
+      "max_height_m": 0.7,
+      "rooting_depth_m": [1.0, 2.0], "depletion_p": 0.55,
+      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
+      "sources": {"family": "botany", "stand_years": "plan_4_2", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
+      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences", "stand_years (confirm)", "spring seeding window"]
+    },
+    {
+      "id": "oats", "name": "Oats (spring)", "family": "grass", "type": "cash",
+      "season_windows": {
+        "iowa": {"plant": ["04-02", "05-02"], "harvest": ["07-17", "08-05"]},
+        "kansas": {"plant": ["03-05", "04-01"], "harvest": ["07-15", "08-01"]}
+      },
+      "kc": {"ini": 0.3, "mid": 1.15, "end": 0.25},
+      "max_height_m": 1,
+      "rooting_depth_m": [1.0, 1.5], "depletion_p": 0.55,
+      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
+      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+    },
+    {
+      "id": "sunflower", "name": "Sunflower", "family": "aster", "type": "cash",
+      "season_windows": {
+        "kansas": {"plant": ["05-25", "06-30"], "harvest": ["10-01", "11-15"]}
+      },
+      "kc": {"ini": 0.35, "mid": [1.0, 1.15], "end": 0.35},
+      "max_height_m": 2.0,
+      "rooting_depth_m": [0.8, 1.5], "depletion_p": 0.45,
+      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
+      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+    },
+    {
+      "id": "cereal_rye", "name": "Cereal rye", "family": "grass", "type": "cover",
+      "cover": {"timing": "late fall tolerated", "winter_hardy": true, "min_days_before_first_frost": 0},
+      "cover_note": "min_days_before_first_frost = 0 is our reading of SARE's 'late fall is tolerated'; rye survives to spring even when planted late.",
+      "kc": null, "rooting_depth_m": null, "depletion_p": null,
+      "sources": {"family": "botany", "cover": "sare_ch6"},
+      "todo": ["kc (no FAO cereal rye row)", "rooting_depth_m", "depletion_p", "n_effect", "residue_cover"]
+    },
+    {
+      "id": "crimson_clover", "name": "Crimson clover", "family": "legume", "type": "cover",
+      "cover": {"timing": "mid-fall, at least two weeks before average frost", "winter_hardy": false, "min_days_before_first_frost": 14},
+      "cover_note": "SARE: overwinters in the southern Corn Belt but not the northern Corn Belt; treated as winter-killed in Iowa.",
+      "kc": null, "rooting_depth_m": null, "depletion_p": null,
+      "sources": {"family": "botany", "cover": "sare_ch6"},
+      "todo": ["kc (FAO lists Berseem, not crimson clover)", "rooting_depth_m", "depletion_p", "n_effect", "residue_cover"]
+    },
+    {
+      "id": "radish", "name": "Forage radish", "family": "brassica", "type": "cover",
+      "cover": {"timing": "late summer to early fall", "winter_hardy": false, "min_days_before_first_frost": null},
+      "kc": {"ini": 0.7, "mid": 0.90, "end": 0.85},
+      "kc_note": "FAO row 'Radish' (garden radish) used as an analog for forage radish",
+      "max_height_m": 0.3,
+      "rooting_depth_m": [0.3, 0.5], "depletion_p": 0.30,
+      "sources": {"family": "botany", "cover": "sare_ch6", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
+      "todo": ["min_days_before_first_frost (SARE gives no number)", "n_effect", "residue_cover"]
+    }
+  ]
+}

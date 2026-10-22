@@ -131,8 +131,9 @@ Per crop (every value has a `source` field):
 - `residue_cover` (low / med / high), `soil_preferences` (texture, drainage)
 
 ### 4.2 Rotation Generation (rules, not a fixed list)
-Enumerate all 3-, 4- and 5-year sequences from the crop set, then filter with agronomic rules:
-- No same crop family in consecutive years (exception: perennials like alfalfa, 2–3 yr stands).
+Enumerate all 2-, 3-, 4- and 5-year sequences from the crop set (2 years covers corn–soybean), then filter with agronomic rules:
+- No same crop in consecutive years (exception: perennials like alfalfa, 2–3 yr stands). Different crops from the same family in a row (e.g. oats → corn) are allowed and penalized by the Diversity score instead.
+- A fall-planted crop (winter wheat) can't follow a crop harvested after its planting window closes.
 - Crop must fit the location's **current** season length / GDD (from F2).
 - Cover crop is allowed only if the gap between cash-crop harvest and the next planting (or killing frost) is ≥ N days, computed from POWER frost dates.
 - Soil filter: e.g., penalize or exclude crops poorly suited to the soil's drainage/texture.
