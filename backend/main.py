@@ -15,10 +15,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 import snapshots
-from climate_shift import NOW, THEN, compare_periods, takeaways, yearly_indicators
+from climate_shift import NOW, THEN, classify_climate_zone, compare_periods, takeaways, yearly_indicators
+from crops import crops_for_pack, load as load_crops
 from eonet_client import fetch_hazards
 from power_client import fetch_power_daily
-from scoring import describe, recommend, score_rotation
+from scoring import default_pack, describe, recommend, score_rotation
 from soil_client import FAO56_AWC_MM_PER_M, get_soil, manual_profile
 
 app = FastAPI(title="Field Shift API", version="0.1.0")
@@ -137,6 +138,21 @@ def soil(lat: Lat, lon: Lon):
 def hazards(lat: Lat, lon: Lon):
     """EONET events near the point, as GeoJSON. Context only: never used in scoring."""
     return clean(fetch_hazards(lat, lon))
+
+
+@app.get("/api/crops")
+def crops(lat: Lat, lon: Lon, pack: str | None = None):
+    """The crop pack used for the point, so the UI can offer its crops for current practice."""
+    zone = classify_climate_zone(lat, fetch_power_daily(lat, lon))
+    pack = pack or default_pack(lat, lon, zone)
+    if pack not in load_crops()["packs"]:
+        raise ValueError(f"Unknown crop pack {pack!r}")
+    in_pack = crops_for_pack(pack)
+    return clean({
+        "zone": zone, "pack": pack,
+        "crops": [{"id": c, "name": crop["name"], "family": crop["family"], "type": crop["type"]}
+                  for c, crop in in_pack.items()],
+    })
 
 
 @app.post("/api/recommend")

@@ -2,8 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { CircleMarker, MapContainer, TileLayer, useMapEvents } from "react-leaflet";
-
-export type Point = { lat: number; lon: number };
+import type { Point } from "@/lib/api";
 
 type Props = {
   point: Point | null;

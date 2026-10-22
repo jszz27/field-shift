@@ -38,6 +38,13 @@ def test_hazards_is_geojson(client):
     assert body["type"] == "FeatureCollection" and len(body["features"]) == 12
 
 
+def test_crops_for_point(client):
+    body = client.get("/api/crops", params=NIAMEY).json()
+    assert body["zone"] == "tropical" and body["pack"] == "semi_arid_tropics"
+    assert {"id": "pearl_millet", "name": "Pearl millet", "family": "grass", "type": "cash"} in body["crops"]
+    assert client.get("/api/crops", params={**AMES, "pack": "mars"}).status_code == 422
+
+
 def test_recommend(client):
     body = client.post("/api/recommend", json={**AMES, "baseline": ["maize"]}).json()
     assert body["pack"] == "us_midwest"
