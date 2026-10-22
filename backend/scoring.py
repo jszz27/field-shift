@@ -47,6 +47,74 @@ GROUPS = {
 HIGHER_IS_BETTER = {"water_demand": False, "n_balance": False, "soil_cover": True, "yield_loss_pct": False,
                     "heat_days": False, "diversity": True, "simplicity": False}
 STAGES = ("ini", "dev", "mid", "late")
+# How each score is computed, shown to users by /api/methodology. crop/pack fields name the
+# crops.json values the indicator reads; site names the location data it reads.
+METHODOLOGY = {
+    "n_balance": {
+        "name": "Nitrogen balance", "unit": "kg N/ha/yr fertilizer", "better": "lower",
+        "formula": "Each year: max(0, N rate for the crop + adjustment from the crop before it). Legumes "
+                   "(n_effect = fixes) need no fertilizer. Averaged over the rotation's years.",
+        "crop": ["n_effect", "n_season"], "pack": ["n_need_kg_ha", "next_crop_n_adjust_kg_ha"], "site": [],
+        "assumptions": ["Cover-crop nitrogen credits are not counted (no sourced values yet)."],
+    },
+    "soil_cover": {
+        "name": "Soil cover", "unit": "% of the year", "better": "higher",
+        "formula": "Share of days in the rotation cycle with the soil covered: a growing crop or cover crop counts 1; "
+                   "leftover residue after harvest counts 0.5 (high residue), 0.25 (medium) or 0 (low).",
+        "crop": ["residue_cover", "cover"], "pack": ["plant", "harvest", "plant_after", "stage_days"],
+        "site": ["first_fall_frost", "rain_onset"],
+        "assumptions": ["Residue weights 0.5 / 0.25 / 0 are a team assumption.",
+                        "A cover crop fits when the previous crop is harvested at least min_days_before_first_frost "
+                        "before the site's current first fall frost."],
+    },
+    "diversity": {
+        "name": "Diversity", "unit": "crops + families", "better": "higher",
+        "formula": "Number of different crops plus number of different plant families in the rotation.",
+        "crop": ["family"], "pack": [], "site": [], "assumptions": [],
+    },
+    "water_demand": {
+        "name": "Water demand", "unit": "mm/yr irrigation gap", "better": "lower",
+        "formula": "Daily crop water use ETc = Kc(day) x ET0(day), with Kc following the FAO-56 stage curve. Root-zone "
+                   "depletion Dr grows by ETc minus rain; when Dr passes RAW = p x TAW (TAW = soil water holding x "
+                   "rooting depth) the excess is the irrigation gap. Mean over 2005-2024 seasons and the rotation's years.",
+        "crop": ["kc", "rooting_depth_m", "depletion_p"], "pack": ["stage_days", "plant", "plant_after"],
+        "site": ["awc_mm_per_m", "PRECTOTCORR", "et0"],
+        "assumptions": ["Soil is at field capacity at planting.", "Roots are at full depth all season.",
+                        "Cover crops are not in the water balance (no sourced Kc for rye or clover)."],
+    },
+    "climate_risk": {
+        "name": "Climate risk", "unit": "yield loss % and heat days", "better": "lower",
+        "formula": "Water-limited yield loss = ky x (1 - ETa / ETc) (FAO-33), where rainfed ETa uses the FAO-56 stress "
+                   "coefficient Ks = (TAW - Dr) / ((1 - p) x TAW) once Dr passes RAW. Heat days = days in the mid-season "
+                   "stage with daily mean temperature above the crop's heat threshold. Score = mean of the two scores.",
+        "crop": ["ky", "heat", "kc", "rooting_depth_m", "depletion_p"], "pack": ["stage_days"],
+        "site": ["awc_mm_per_m", "PRECTOTCORR", "et0", "T2M"],
+        "assumptions": ["A hay crop (alfalfa) has no grain-set stage, so it gets 0 heat days."],
+    },
+    "simplicity": {
+        "name": "Simplicity", "unit": "crops (+1 for a perennial)", "better": "lower",
+        "formula": "Number of different crops, plus 1 if the rotation has a perennial hay crop that needs its own equipment.",
+        "crop": ["type"], "pack": [], "site": [], "assumptions": ["This penalty is a team assumption."],
+    },
+}
+FINAL_FORMULA = (
+    "Each measure is scaled 0-100 within the rotations compared: 100 x (value - worst) / (best - worst), so 100 is the "
+    "best in the set. Group scores: Soil health = mean of nitrogen, soil cover and diversity; Water conservation = water "
+    "demand; Yield stability = climate risk; Simplicity = simplicity. Final = sum of (slider weight x group score) / sum "
+    "of weights, using only the measures that can also be scored for your current practice."
+)
+# Location data the indicators read (crop values cite crops.json sources instead)
+SITE_SOURCES = {
+    "power": {"title": "NASA POWER daily point data, AG community (rain PRECTOTCORR, temperature T2M, ET0 inputs)",
+              "url": "https://power.larc.nasa.gov/"},
+    "fao56_et0": {"title": "FAO-56 Penman-Monteith reference evapotranspiration (ET0), computed from POWER",
+                  "url": "https://www.fao.org/4/x0490e/x0490e06.htm"},
+    "ssurgo": {"title": "USDA NRCS SSURGO soil survey (Soil Data Access)", "url": "https://sdmdataaccess.sc.egov.usda.gov/"},
+    "soilgrids": {"title": "ISRIC SoilGrids 2.0", "url": "https://soilgrids.org/"},
+    "manual_soil": {"title": "FAO-56 Table 19 typical soil water by texture (manual choice)",
+                    "url": "https://www.fao.org/4/x0490e/x0490e0c.htm"},
+}
+
 # Pack used when the request names none and the point is not a demo site
 ZONE_PACK = {"north_temperate": "us_midwest", "south_temperate": "south_temperate", "tropical": "semi_arid_tropics"}
 
@@ -87,6 +155,27 @@ def water_balance(rain, etc, taw, p):
         eta += actual
         depletion = min(taw, max(0.0, depletion - r + actual))
     return gap, eta
+
+
+def methodology(pack_id):
+    """Formulas, assumptions and every crop value in the pack with its source, for the methodology panel."""
+    data = load_crops()
+    if pack_id not in data["packs"]:
+        raise ValueError(f"Unknown crop pack {pack_id!r}")
+    skip = {"id", "name", "type", "sources", "pack", "season_windows"}  # type is returned on its own (a label, not data)
+    crops = {}
+    for crop_id, crop in crops_for_pack(pack_id, data).items():
+        entry = crop["pack"]
+        crops[crop_id] = {
+            "name": crop["name"], "type": crop["type"],
+            "library": {k: {"value": v, "source": crop["sources"].get(k)}
+                        for k, v in crop.items() if k not in skip and not k.endswith("_note")},
+            "pack": {k: {"value": v, "source": entry["sources"].get(k)}
+                     for k, v in entry.items() if k != "sources" and not k.endswith("_note")},
+            "notes": {k: v for k, v in {**crop, **entry}.items() if k.endswith("_note")},
+        }
+    return {"pack": pack_id, "indicators": METHODOLOGY, "final": FINAL_FORMULA, "crops": crops,
+            "sources": {**data["sources"], **SITE_SOURCES}}
 
 
 def default_pack(lat, lon, zone):

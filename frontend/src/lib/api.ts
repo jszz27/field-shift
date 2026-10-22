@@ -83,7 +83,36 @@ export type ClimateShiftResponse = {
   offline: boolean;
 };
 
-type ErrorBody ={ detail?: string | { msg: string }[] };
+export type SourcedValue = { value: unknown; source: string | null };
+
+export type MethodologyIndicator = {
+  name: string;
+  unit: string;
+  better: "lower" | "higher";
+  formula: string;
+  crop: string[];
+  pack: string[];
+  site: string[];
+  assumptions: string[];
+};
+
+export type MethodologyCrop = {
+  name: string;
+  type: Crop["type"];
+  library: Record<string, SourcedValue>;
+  pack: Record<string, SourcedValue>;
+  notes: Record<string, string>;
+};
+
+export type MethodologyResponse = {
+  pack: string;
+  indicators: Record<string, MethodologyIndicator>;
+  final: string;
+  crops: Record<string, MethodologyCrop>;
+  sources: Record<string, { title: string; url: string | null }>;
+};
+
+type ErrorBody = { detail?: string | { msg: string }[] };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
@@ -107,6 +136,7 @@ export const api = {
   climateShift: (p: Point) => request<ClimateShiftResponse>(`/api/climate-shift?${query(p)}`),
   soil: (p: Point) => request<SoilResponse>(`/api/soil?${query(p)}`),
   crops: (p: Point) => request<CropsResponse>(`/api/crops?${query(p)}`),
+  methodology: (pack: string) => request<MethodologyResponse>(`/api/methodology?pack=${encodeURIComponent(pack)}`),
   recommend: (req: RecommendRequest) => post<RecommendResponse>("/api/recommend", req),
   score: (req: ScoreRequest) => post<ScoreResponse>("/api/score", req),
 };

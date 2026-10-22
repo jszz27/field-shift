@@ -19,7 +19,7 @@ from climate_shift import NOW, THEN, classify_climate_zone, compare_periods, tak
 from crops import crops_for_pack, load as load_crops
 from eonet_client import fetch_hazards
 from power_client import fetch_power_daily
-from scoring import default_pack, describe, recommend, score_rotation
+from scoring import default_pack, describe, methodology, recommend, score_rotation
 from soil_client import FAO56_AWC_MM_PER_M, get_soil, manual_profile
 
 app = FastAPI(title="Field Shift API", version="0.1.0")
@@ -153,6 +153,12 @@ def crops(lat: Lat, lon: Lon, pack: str | None = None):
         "crops": [{"id": c, "name": crop["name"], "family": crop["family"], "type": crop["type"]}
                   for c, crop in in_pack.items()],
     })
+
+
+@app.get("/api/methodology")
+def scoring_methodology(pack: str):
+    """How every score is computed: formulas, assumptions, and each crop value with its source."""
+    return clean(methodology(pack))
 
 
 @app.post("/api/recommend")

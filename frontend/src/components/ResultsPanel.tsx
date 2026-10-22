@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, type Crop, type ScoreResponse, type ScoredRotation } from "@/lib/api";
 import type { Recommendation } from "./InputsPanel";
+import MethodologyPanel from "./MethodologyPanel";
 
 const INDICATORS = [
   { key: "n_balance", label: "Nitrogen" },
@@ -253,6 +254,10 @@ export default function ResultsPanel({ result }: { result: Recommendation }) {
         <p className="mt-3 text-xs text-zinc-500">
           Scores are 0–100 relative to the rotations compared here (100 = best of the set), weighted by your priorities.
         </p>
+        <MethodologyPanel
+          pack={response.pack} zone={response.zone} rotation={shown} baseline={base}
+          soil={response.soil} weights={request.weights}
+        />
       </section>
     </div>
   );

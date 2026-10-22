@@ -52,6 +52,20 @@ def test_crops_for_point(client):
     assert client.get("/api/crops", params={**AMES, "pack": "mars"}).status_code == 422
 
 
+def test_methodology_lists_formulas_inputs_and_sources(client):
+    body = client.get("/api/methodology", params={"pack": "us_midwest"}).json()
+    assert set(body["indicators"]) == {"n_balance", "soil_cover", "diversity", "water_demand", "climate_risk", "simplicity"}
+    assert all(i["formula"] for i in body["indicators"].values()) and "100 x" in body["final"]
+    maize = body["crops"]["maize"]
+    assert maize["library"]["kc"] == {"value": {"ini": 0.3, "mid": 1.2, "end": [0.35, 0.6]}, "source": "fao56_t12"}
+    assert maize["pack"]["n_need_kg_ha"]["source"] == "isu_n_2008"
+    used = {f["source"] for c in body["crops"].values() for f in [*c["library"].values(), *c["pack"].values()]
+            if f["value"] is not None}
+    assert used <= set(body["sources"])          # every value used names a listed source
+    assert "power" in body["sources"]
+    assert client.get("/api/methodology", params={"pack": "mars"}).status_code == 422
+
+
 def test_recommend(client):
     body = client.post("/api/recommend", json={**AMES, "baseline": ["maize"]}).json()
     assert body["pack"] == "us_midwest"
