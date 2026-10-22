@@ -408,6 +408,13 @@
           "stage_days": {"ini": 25, "dev": 35, "mid": 45, "late": 25}, "stage_note": "FAO-56 Table 11 groundnut, dry season, West Africa",
           "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
           "sources": {"plant_after": "nirval_1995", "stage_days": "fao56_t11"}
+        },
+        "cowpea": {
+          "plant_after": null,
+          "plant_note": "Main Sahel legume, added for the Niamey demo; no sowing-window source yet.",
+          "stage_days": {"ini": 20, "dev": 30, "mid": 30, "late": 20}, "stage_note": "FAO-56 Table 11 green gram/cowpeas, March, Mediterranean (only row)",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"stage_days": "fao56_t11"}
         }
       }
     },

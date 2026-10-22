@@ -8,15 +8,19 @@ from pathlib import Path
 
 import requests
 
+import snapshots
+
 EONET_URL = "https://eonet.gsfc.nasa.gov/api/v3/events/geojson"
 CATEGORIES = ["drought", "floods", "severeStorms", "tempExtremes", "wildfires"]
 BOX_DEGREES = 3.0
 CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
 
 
-def fetch_hazards(lat, lon, start="2015-01-01", end=None):
-    """FeatureCollection of hazard events within ±BOX_DEGREES of the point."""
+def fetch_hazards_raw(lat, lon, start="2015-01-01", end=None):
+    """The EONET API GeoJSON, from the demo snapshot (OFFLINE=1), the cache or the network."""
     lat, lon = round(lat, 2), round(lon, 2)
+    if snapshots.offline():
+        return snapshots.read("eonet", lat, lon)
     end = end or date.today().isoformat()
     cache_file = CACHE_DIR / f"eonet_{lat}_{lon}_{start}_{end}.json"
 
@@ -34,7 +38,12 @@ def fetch_hazards(lat, lon, start="2015-01-01", end=None):
         resp.raise_for_status()
         data = resp.json()
         cache_file.write_text(json.dumps(data))
+    return data
 
+
+def fetch_hazards(lat, lon, start="2015-01-01", end=None):
+    """FeatureCollection of hazard events within ±BOX_DEGREES of the point."""
+    data = fetch_hazards_raw(lat, lon, start, end)
     # Prescribed burns are planned land management, not hazards
     features = [f for f in data["features"] if "prescribed" not in f["properties"]["title"].lower()]
     return {"type": "FeatureCollection", "features": sorted(features, key=lambda f: f["properties"]["date"])}

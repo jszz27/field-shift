@@ -1,0 +1,25 @@
+{
+  "notes": [
+    "Demo locations (plan §5). build_snapshots.py saves every API response for these points to snapshots/<id>/; with OFFLINE=1 the clients read them back.",
+    "snapshot_end fixes the EONET end date so a rebuilt snapshot does not change.",
+    "baseline_practice is the farmer's current rotation for the demo, one crop id per harvest year. Ames is plan §5's 'continuous corn'; Niamey's continuous pearl millet is a team assumption for the pitch, not a sourced survey value.",
+    "Niamey is placed 5 km east of the city: SoilGrids masks the city and river pixels."
+  ],
+  "snapshot_end": "2026-10-31",
+  "sites": [
+    {
+      "id": "ames_ia", "name": "Ames, Iowa, USA",
+      "lat": 42.03, "lon": -93.62,
+      "zone": "north_temperate", "crop_pack": "us_midwest",
+      "baseline_practice": ["maize"],
+      "soil_source": "ssurgo"
+    },
+    {
+      "id": "niamey_ne", "name": "Niamey area, Niger",
+      "lat": 13.51, "lon": 2.16,
+      "zone": "tropical", "crop_pack": "semi_arid_tropics",
+      "baseline_practice": ["pearl_millet"],
+      "soil_source": "soilgrids"
+    }
+  ]
+}

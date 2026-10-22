@@ -9,6 +9,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+import snapshots
+
 POWER_URL = "https://power.larc.nasa.gov/api/temporal/daily/point"
 PARAMETERS = [
     "T2M", "T2M_MAX", "T2M_MIN",  # air temperature at 2 m (°C)
@@ -21,9 +23,11 @@ FILL_VALUE = -999.0
 CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
 
 
-def fetch_power_daily(lat, lon, start="19810101", end="20241231"):
-    """Return a DataFrame of daily POWER values, one row per date."""
+def fetch_power_raw(lat, lon, start="19810101", end="20241231"):
+    """The POWER API JSON, from the demo snapshot (OFFLINE=1), the cache or the network."""
     lat, lon = round(lat, 2), round(lon, 2)
+    if snapshots.offline():
+        return snapshots.read("power", lat, lon)
     cache_file = CACHE_DIR / f"power_{lat}_{lon}_{start}_{end}.json"
 
     if cache_file.exists():
@@ -43,7 +47,12 @@ def fetch_power_daily(lat, lon, start="19810101", end="20241231"):
         resp.raise_for_status()
         data = resp.json()
         cache_file.write_text(json.dumps(data))
+    return data
 
+
+def fetch_power_daily(lat, lon, start="19810101", end="20241231"):
+    """Return a DataFrame of daily POWER values, one row per date."""
+    data = fetch_power_raw(lat, lon, start, end)
     df = pd.DataFrame(data["properties"]["parameter"])
     df.index = pd.to_datetime(df.index, format="%Y%m%d")
     df.index.name = "date"
