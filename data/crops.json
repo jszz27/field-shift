@@ -1,14 +1,27 @@
 {
-  "version": 1,
+  "version": 2,
   "notes": [
     "Every filled value names its source id in the crop's 'sources' map; fields still needing research are listed in 'todo' and set to null.",
     "Season windows are USDA 'most active' planting/harvest spans (MM-DD). Crop 'year' in a rotation = its harvest year, so winter wheat is planted the fall before.",
     "Kc ini values are FAO-56 Table 12 crop-group values (the per-crop column is an image on the FAO page).",
-    "Where FAO gives a range, it is kept as [low, high]; scoring (Step 8) decides which end applies."
+    "Where a source gives a range, it is kept as [low, high]; scoring (Step 8) decides which end applies.",
+    "ky (FAO-33 seasonal yield response factor) replaces the plan's 1-5 drought_tolerance: ky > 1 = yield drops more than the water deficit (drought sensitive), ky < 1 = tolerant.",
+    "base_temp_c and heat_threshold_c are MEAN daily temperatures (USDA TB1935 Table 5.1, diurnal range up to 10 C); heat_threshold_c is the reproductive-stage failure (ceiling) temperature, not a daily maximum.",
+    "gdd_required uses the same 86/50 F method as climate_shift.py, in C-days (F-days x 5/9). Only corn has a sourced value; soybean flowering is daylength-driven (FAO) and wheat needs vernalization, so a base-10 C GDD total does not apply to them.",
+    "n_effect follows K-State MF2586 (Jan 2024), in its units: need_lb_n_per_unit = lb fertilizer N per unit of expected yield (ie/fe with non-irrigated ie and default fe 0.55 where the formula has them); next_crop_adjust_lb_n_ac = this crop's 'previous crop adjustment' to the next crop's N rate (negative = credit), split by whether the next crop is warm- or cool-season. Alfalfa uses the 'good stand' row.",
+    "soil_preferences textures use the USDA class names from soil_client.texture_class."
   ],
   "sources": {
     "fao56_t12": {"title": "FAO-56 Table 12: single crop coefficients Kc and maximum plant heights", "url": "https://www.fao.org/4/x0490e/x0490e0b.htm"},
     "fao56_t22": {"title": "FAO-56 Table 22: maximum effective rooting depth Zr and depletion fraction p", "url": "https://www.fao.org/4/x0490e/x0490e0e.htm"},
+    "fao33_ky": {"title": "FAO-66 Crop yield response to water, Ch. 2, Table 1: seasonal Ky values from FAO Irrigation and Drainage Paper 33", "url": "https://www.fao.org/4/i2800e/i2800e02.pdf"},
+    "fao_crop_info": {"title": "FAO Land & Water crop information pages (maize, soybean, wheat, sorghum, sunflower), archived copy; the live pages were removed", "url": "https://web.archive.org/web/2022/https://www.fao.org/land-water/databases-and-software/crop-information/maize/en/"},
+    "usda_tb1935": {"title": "USDA Technical Bulletin 1935, Climate Change and Agriculture in the United States (2013), Table 5.1: cardinal and failure temperatures", "url": "https://dr.lib.iastate.edu/entities/publication/8a646593-a172-4e33-a628-f9555c51643d"},
+    "isu_gdd_2025": {"title": "Iowa State Univ. Extension (S. Archontoulis), Corn grain moisture, Aug 28 2025: 'a 110-day hybrid requires about 2,650 F-days to reach maturity'", "url": "https://crops.extension.iastate.edu/post/corn-grain-moisture-august-28-2025"},
+    "ksu_mf2586": {"title": "K-State Research and Extension MF2586, Soil Test Interpretations and Fertilizer Recommendations (rev. Jan 2024), Nitrogen section", "url": "https://bookstore.ksre.ksu.edu/pubs/MF2586.pdf"},
+    "nrcs_residue_2006": {"title": "USDA NRCS, What is crop residue management? (rev. Dec 2006): high vs low (fragile) residue crops", "url": "https://www.mssoy.org/sites/default/files/documents/residue-mgmt-nrcs-2006.pdf"},
+    "nrcs_mi_329": {"title": "USDA NRCS Michigan, 329 Residue and Tillage Management, No-Till Management Plan: fragile vs non-fragile residues", "url": "https://efotg.sc.egov.usda.gov/api/CPSFile/4735/329_MI_IR_Residue_and_Tillage_Management_No-Till-Management_Plan_1997"},
+    "umn_alfalfa": {"title": "Univ. of Minnesota Extension, Alfalfa establishment: steps to maximize yield", "url": "https://extension.umn.edu/planting-forages/alfalfa-establishment-steps-maximize-yield"},
     "nass_2010": {"title": "USDA NASS, Field Crops Usual Planting and Harvesting Dates (Agricultural Handbook 628), Oct 2010", "url": "https://esmis.nal.usda.gov/concern/publications/vm40xr56k"},
     "sare_ch6": {"title": "SARE, Cover Crops (R. Myers), Ch. 6: Simple Steps for Getting Started with Cover Crops", "url": "https://www.sare.org/publications/cover-crop-book/ch-6-simple-steps-for-getting-started-with-cover-crops/"},
     "plan_4_2": {"title": "Field Shift plan.md §4.2 (team assumption, to be confirmed with an extension source)", "url": null},
@@ -24,9 +37,16 @@
       "kc": {"ini": 0.3, "mid": 1.20, "end": [0.35, 0.60]},
       "max_height_m": 2,
       "rooting_depth_m": [1.0, 1.7], "depletion_p": 0.55,
-      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
-      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+      "ky": 1.25,
+      "base_temp_c": 8, "gdd_required": 1472,
+      "gdd_note": "2,650 F-days for a 110-day hybrid",
+      "heat_sensitive_stage": "reproductive", "heat_threshold_c": 35,
+      "n_effect": {"fixes_n": false, "season": "warm", "need_lb_n_per_unit": 1.6, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": {"warm": 0, "cool": 0}},
+      "residue_cover": "high",
+      "soil_preferences": {"prefer": null, "avoid_textures": ["clay", "sand"], "needs_good_drainage": true, "ph": null},
+      "soil_note": "FAO: does well on most soils but less so on very heavy dense clay and very sandy soils; susceptible to waterlogging.",
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "gdd_required": "isu_gdd_2025", "heat_threshold_c": "usda_tb1935", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
+      "todo": []
     },
     {
       "id": "soybean", "name": "Soybean", "family": "legume", "type": "cash",
@@ -37,9 +57,16 @@
       "kc": {"ini": 0.4, "mid": 1.15, "end": 0.50},
       "max_height_m": [0.5, 1.0],
       "rooting_depth_m": [0.6, 1.3], "depletion_p": 0.50,
-      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
-      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+      "ky": 0.85,
+      "base_temp_c": 7, "gdd_required": null,
+      "gdd_note": "Not applicable: FAO describes soybean as a short-day plant whose flowering depends on daylength.",
+      "heat_sensitive_stage": "reproductive", "heat_threshold_c": 39,
+      "n_effect": {"fixes_n": true, "season": "warm", "need_lb_n_per_unit": null, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": {"warm": -40, "cool": 0}},
+      "residue_cover": "low",
+      "soil_preferences": {"prefer": null, "avoid_textures": ["sand"], "needs_good_drainage": true, "ph": [6.0, 6.5]},
+      "soil_note": "FAO: wide range of soils except very sandy; sensitive to waterlogging; optimum pH 6 to 6.5.",
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "gdd_required": "fao_crop_info", "heat_threshold_c": "usda_tb1935", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
+      "todo": []
     },
     {
       "id": "winter_wheat", "name": "Winter wheat", "family": "grass", "type": "cash",
@@ -51,9 +78,16 @@
       "kc_note": "FAO row 'Winter wheat, with frozen soils'",
       "max_height_m": 1,
       "rooting_depth_m": [1.5, 1.8], "depletion_p": 0.55,
-      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
-      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+      "ky": 1.05,
+      "base_temp_c": 0, "gdd_required": null,
+      "gdd_note": "Not applicable: winter wheat needs vernalization over winter, so a base-10 C season total does not describe it.",
+      "heat_sensitive_stage": "reproductive", "heat_threshold_c": 34,
+      "n_effect": {"fixes_n": false, "season": "cool", "need_lb_n_per_unit": 2.6, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": {"warm": 0, "cool": 0}},
+      "residue_cover": "high",
+      "soil_preferences": {"prefer": "medium", "avoid_textures": [], "needs_good_drainage": null, "ph": [6.0, 8.0]},
+      "soil_note": "FAO: wide range of soils but medium textures are preferred; optimum pH 6 to 8.",
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "gdd_required": "fao_crop_info", "heat_threshold_c": "usda_tb1935", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
+      "todo": []
     },
     {
       "id": "sorghum", "name": "Sorghum (grain)", "family": "grass", "type": "cash",
@@ -63,9 +97,15 @@
       "kc": {"ini": 0.3, "mid": [1.00, 1.10], "end": 0.55},
       "max_height_m": [1, 2],
       "rooting_depth_m": [1.0, 2.0], "depletion_p": 0.55,
-      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
-      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+      "ky": 0.9,
+      "base_temp_c": 8, "gdd_required": null,
+      "heat_sensitive_stage": "reproductive", "heat_threshold_c": 35,
+      "n_effect": {"fixes_n": false, "season": "warm", "need_lb_n_per_unit": 2.2, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": {"warm": 0, "cool": 30}},
+      "residue_cover": "high",
+      "soil_preferences": {"prefer": "light to medium", "avoid_textures": [], "needs_good_drainage": true, "ph": null},
+      "soil_note": "FAO: does well on most soils but better in light to medium textured soils; preferably well-aerated and well-drained.",
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "heat_threshold_c": "usda_tb1935", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
+      "todo": ["gdd_required (K-State sorghum GDD to maturity)"]
     },
     {
       "id": "alfalfa", "name": "Alfalfa (hay)", "family": "legume", "type": "perennial",
@@ -79,9 +119,16 @@
       "kc_note": "FAO row 'Alfalfa hay, averaged cutting effects'",
       "max_height_m": 0.7,
       "rooting_depth_m": [1.0, 2.0], "depletion_p": 0.55,
-      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
-      "sources": {"family": "botany", "stand_years": "plan_4_2", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
-      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences", "stand_years (confirm)", "spring seeding window"]
+      "ky": 1.1,
+      "base_temp_c": null, "gdd_required": null,
+      "heat_sensitive_stage": null, "heat_threshold_c": null,
+      "heat_note": "Hay crop: no grain-set stage, so the reproductive failure temperature does not apply.",
+      "n_effect": {"fixes_n": true, "season": "cool", "need_lb_n_per_unit": null, "yield_unit": "ton", "next_crop_adjust_lb_n_ac": {"warm": -80, "cool": -40}},
+      "residue_cover": "high",
+      "soil_preferences": {"prefer": null, "avoid_textures": [], "needs_good_drainage": true, "ph": [6.5, 7.0]},
+      "soil_note": "UMN: prefers well-drained, deep soils; keeping pH between 6.5 and 7.0 is extremely important.",
+      "sources": {"family": "botany", "stand_years": "plan_4_2", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_mi_329", "soil_preferences": "umn_alfalfa"},
+      "todo": ["stand_years (confirm)", "spring seeding window", "base_temp_c"]
     },
     {
       "id": "oats", "name": "Oats (spring)", "family": "grass", "type": "cash",
@@ -92,9 +139,14 @@
       "kc": {"ini": 0.3, "mid": 1.15, "end": 0.25},
       "max_height_m": 1,
       "rooting_depth_m": [1.0, 1.5], "depletion_p": 0.55,
-      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
-      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+      "ky": null,
+      "base_temp_c": null, "gdd_required": null,
+      "heat_sensitive_stage": "reproductive", "heat_threshold_c": null,
+      "n_effect": {"fixes_n": false, "season": "cool", "need_lb_n_per_unit": 1.3, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": null},
+      "residue_cover": "high",
+      "soil_preferences": null,
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006"},
+      "todo": ["ky (FAO-33 has no oats row)", "base_temp_c", "heat_threshold_c", "next_crop_adjust_lb_n_ac (MF2586 lists no oats row)", "soil_preferences"]
     },
     {
       "id": "sunflower", "name": "Sunflower", "family": "aster", "type": "cash",
@@ -104,9 +156,15 @@
       "kc": {"ini": 0.35, "mid": [1.0, 1.15], "end": 0.35},
       "max_height_m": 2.0,
       "rooting_depth_m": [0.8, 1.5], "depletion_p": 0.45,
-      "gdd_required": null, "heat_threshold_c": null, "drought_tolerance": null, "n_effect": null, "residue_cover": null, "soil_preferences": null,
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
-      "todo": ["gdd_required", "heat_threshold_c", "drought_tolerance", "n_effect", "residue_cover", "soil_preferences"]
+      "ky": 0.95,
+      "base_temp_c": null, "gdd_required": null,
+      "heat_sensitive_stage": "reproductive", "heat_threshold_c": null,
+      "n_effect": {"fixes_n": false, "season": "warm", "need_lb_n_per_unit": 0.075, "yield_unit": "lb", "next_crop_adjust_lb_n_ac": {"warm": 0, "cool": 30}},
+      "residue_cover": "low",
+      "soil_preferences": {"prefer": null, "avoid_textures": [], "needs_good_drainage": null, "ph": [6.0, 7.5]},
+      "soil_note": "FAO: grown on a wide range of soils; under low rainfall needs a deep soil with good water holding capacity; optimum pH 6.0 to 7.5.",
+      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
+      "todo": ["base_temp_c", "gdd_required", "heat_threshold_c"]
     },
     {
       "id": "cereal_rye", "name": "Cereal rye", "family": "grass", "type": "cover",
@@ -122,7 +180,7 @@
       "cover_note": "SARE: overwinters in the southern Corn Belt but not the northern Corn Belt; treated as winter-killed in Iowa.",
       "kc": null, "rooting_depth_m": null, "depletion_p": null,
       "sources": {"family": "botany", "cover": "sare_ch6"},
-      "todo": ["kc (FAO lists Berseem, not crimson clover)", "rooting_depth_m", "depletion_p", "n_effect", "residue_cover"]
+      "todo": ["kc (FAO lists Berseem, not crimson clover)", "rooting_depth_m", "depletion_p", "n_effect (MF2586 lists red and sweet clover only)", "residue_cover"]
     },
     {
       "id": "radish", "name": "Forage radish", "family": "brassica", "type": "cover",
