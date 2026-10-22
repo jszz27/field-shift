@@ -7,27 +7,21 @@ last year is followed by the first. Each rejection names the rule it broke:
   timing  - a fall-planted crop (winter wheat) after a crop harvested too late
 Two different crops from the same family in a row (e.g. oats -> corn) are
 allowed here and penalized by the Diversity score instead (Step 8), since
-small grain -> corn is a standard Corn Belt rotation. Only crops with a USDA season window for the region are used. Cover crops fill
+small grain -> corn is a standard Corn Belt rotation. Crops and their
+season windows come from the region pack (crops.py). Cover crops fill
 the fall-to-spring gap when the previous crop is harvested at least
 min_days_before_first_frost before the first fall frost. Soil suitability is
-not checked yet: crops.json has no sourced soil_preferences.
+not checked yet.
 """
 import itertools
-import json
-from pathlib import Path
 
 import pandas as pd
 
 from climate_shift import compare_periods, day_of_year_to_date, yearly_indicators
+from crops import crops_for_pack
 from power_client import fetch_power_daily
 
-CROPS_FILE = Path(__file__).resolve().parent.parent / "data" / "crops.json"
 ROTATION_YEARS = (2, 3, 4, 5)  # 2 for corn-soybean, the plan's demo rotation
-
-
-def load_crops():
-    crops = json.loads(CROPS_FILE.read_text(encoding="utf-8"))["crops"]
-    return {c["id"]: c for c in crops}
 
 
 def day_of_year(mm_dd):
@@ -98,9 +92,8 @@ def cover_options(a_id, b_id, crops, region, first_fall_frost):
 
 def generate(region, first_fall_frost):
     """All valid rotations (with cover options per gap) and all rejected ones with reasons."""
-    crops = load_crops()
-    cash = [c for c in crops.values() if c["type"] != "cover"]
-    pool = sorted(c["id"] for c in cash if region in c["season_windows"])
+    crops = crops_for_pack(region)
+    pool = sorted(c["id"] for c in crops.values() if c["type"] != "cover")
     valid, rejected = [], []
     for n in ROTATION_YEARS:
         for seq in itertools.product(pool, repeat=n):
@@ -114,7 +107,6 @@ def generate(region, first_fall_frost):
                 valid.append({"rotation": seq, "covers": covers})
     return {
         "pool": pool,
-        "not_in_region": sorted(c["id"] for c in cash if region not in c["season_windows"]),
         "valid": valid,
         "rejected": rejected,
     }
@@ -125,9 +117,9 @@ if __name__ == "__main__":
     lat = 42.03
     table = compare_periods(yearly_indicators(fetch_power_daily(lat, -93.62), lat))
     frost_then, frost_now = (round(table.loc["first_fall_frost", p]) for p in ("then", "now"))
-    result = generate("iowa", frost_now)
+    result = generate("us_midwest", frost_now)
 
-    print(f"\nCrops used: {result['pool']}; not grown in Iowa per USDA: {result['not_in_region']}")
+    print(f"\nCrops used: {result['pool']}")
     print(f"First fall frost: then {day_of_year_to_date(frost_then)}, now {day_of_year_to_date(frost_now)}")
     print(f"\n{len(result['valid'])} valid, {len(result['rejected'])} rejected")
 

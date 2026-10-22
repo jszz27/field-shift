@@ -1,196 +1,446 @@
 {
-  "version": 2,
+  "version": 3,
   "notes": [
-    "Every filled value names its source id in the crop's 'sources' map; fields still needing research are listed in 'todo' and set to null.",
-    "Season windows are USDA 'most active' planting/harvest spans (MM-DD). Crop 'year' in a rotation = its harvest year, so winter wheat is planted the fall before.",
-    "Kc ini values are FAO-56 Table 12 crop-group values (the per-crop column is an image on the FAO page).",
-    "Where a source gives a range, it is kept as [low, high]; scoring (Step 8) decides which end applies.",
-    "ky (FAO-33 seasonal yield response factor) replaces the plan's 1-5 drought_tolerance: ky > 1 = yield drops more than the water deficit (drought sensitive), ky < 1 = tolerant.",
-    "base_temp_c and heat_threshold_c are MEAN daily temperatures (USDA TB1935 Table 5.1, diurnal range up to 10 C); heat_threshold_c is the reproductive-stage failure (ceiling) temperature, not a daily maximum.",
-    "gdd_required uses the same 86/50 F method as climate_shift.py, in C-days (F-days x 5/9). Only corn has a sourced value; soybean flowering is daylength-driven (FAO) and wheat needs vernalization, so a base-10 C GDD total does not apply to them.",
-    "n_effect follows K-State MF2586 (Jan 2024), in its units: need_lb_n_per_unit = lb fertilizer N per unit of expected yield (ie/fe with non-irrigated ie and default fe 0.55 where the formula has them); next_crop_adjust_lb_n_ac = this crop's 'previous crop adjustment' to the next crop's N rate (negative = credit), split by whether the next crop is warm- or cool-season. Alfalfa uses the 'good stand' row.",
+    "Shared crop library ('crops', each crop defined once) plus region packs ('packs') that list which crops apply and their local timing, stage lengths and nitrogen amounts.",
+    "Every non-null value names its source id in the entry's 'sources' map. Null = not yet sourced; backend/crops.py lists them. Never fill a number without a source.",
+    "Temperate packs use calendar windows: USDA 'most active' planting/harvest spans (MM-DD). A crop's rotation year is its harvest year, so winter wheat is planted the fall before.",
+    "Tropical packs time planting relative to the rainy season found by climate_shift.py: plant_after = {event: onset|end, days: [earliest, latest]}. Harvest = planting + total stage_days.",
+    "stage_days are FAO-56 Table 11 lengths (initial, development, mid, late) from the row closest to the pack's climate; the row used is named in stage_note.",
+    "Kc ini values are FAO-56 Table 12 crop-group values (the per-crop column is an image on the FAO page). Where a source gives a range, it is kept as [low, high].",
+    "ky = FAO-33 seasonal yield response factor (> 1 drought sensitive, < 1 tolerant). drought_tolerance (1-5) stays null until a source with a ranked scale is found; ky is not converted because it measures yield loss per water shortfall, not survival.",
+    "base_temp_c and heat.threshold_c are mean daily temperatures. heat.kind says whether the threshold is where grain yield fails (USDA TB1935) or where yield starts to drop (FAO).",
+    "gdd_required uses the same 86/50 F method as climate_shift.py, in C-days (F-days x 5/9).",
+    "n_effect is the crop's class (fixes / neutral / heavy_feeder). Amounts are regional, so they live in the pack: n_need_kg_ha = fertilizer N for the crop; next_crop_n_adjust_kg_ha = change to the next crop's N rate (negative = credit) by the next crop's n_season (warm/cool, K-State MF2586). lb/acre converted at 1.121 kg/ha per lb/acre.",
     "soil_preferences textures use the USDA class names from soil_client.texture_class."
   ],
   "sources": {
+    "fao56_t11": {"title": "FAO-56 Table 11: lengths of crop development stages for various planting periods and climatic regions", "url": "https://www.fao.org/4/x0490e/x0490e0b.htm"},
     "fao56_t12": {"title": "FAO-56 Table 12: single crop coefficients Kc and maximum plant heights", "url": "https://www.fao.org/4/x0490e/x0490e0b.htm"},
     "fao56_t22": {"title": "FAO-56 Table 22: maximum effective rooting depth Zr and depletion fraction p", "url": "https://www.fao.org/4/x0490e/x0490e0e.htm"},
     "fao33_ky": {"title": "FAO-66 Crop yield response to water, Ch. 2, Table 1: seasonal Ky values from FAO Irrigation and Drainage Paper 33", "url": "https://www.fao.org/4/i2800e/i2800e02.pdf"},
-    "fao_crop_info": {"title": "FAO Land & Water crop information pages (maize, soybean, wheat, sorghum, sunflower), archived copy; the live pages were removed", "url": "https://web.archive.org/web/2022/https://www.fao.org/land-water/databases-and-software/crop-information/maize/en/"},
+    "fao_crop_info": {"title": "FAO Land & Water crop information pages (maize, soybean, wheat, sorghum, sunflower, groundnut), archived copy; the live pages were removed", "url": "https://web.archive.org/web/2022/https://www.fao.org/land-water/databases-and-software/crop-information/maize/en/"},
     "usda_tb1935": {"title": "USDA Technical Bulletin 1935, Climate Change and Agriculture in the United States (2013), Table 5.1: cardinal and failure temperatures", "url": "https://dr.lib.iastate.edu/entities/publication/8a646593-a172-4e33-a628-f9555c51643d"},
     "isu_gdd_2025": {"title": "Iowa State Univ. Extension (S. Archontoulis), Corn grain moisture, Aug 28 2025: 'a 110-day hybrid requires about 2,650 F-days to reach maturity'", "url": "https://crops.extension.iastate.edu/post/corn-grain-moisture-august-28-2025"},
+    "isu_n_2008": {"title": "Iowa State Univ. (J. Sawyer), Don't double dip soybean (2008): MRTN 124 lb N/acre corn after soybean, 181 lb N/acre corn after corn (0.10 price ratio)", "url": "https://www.agronext.iastate.edu/soilfertility/currenttopics/DontDoubleDipSoybean_3-24-08.pdf"},
     "ksu_mf2586": {"title": "K-State Research and Extension MF2586, Soil Test Interpretations and Fertilizer Recommendations (rev. Jan 2024), Nitrogen section", "url": "https://bookstore.ksre.ksu.edu/pubs/MF2586.pdf"},
     "nrcs_residue_2006": {"title": "USDA NRCS, What is crop residue management? (rev. Dec 2006): high vs low (fragile) residue crops", "url": "https://www.mssoy.org/sites/default/files/documents/residue-mgmt-nrcs-2006.pdf"},
     "nrcs_mi_329": {"title": "USDA NRCS Michigan, 329 Residue and Tillage Management, No-Till Management Plan: fragile vs non-fragile residues", "url": "https://efotg.sc.egov.usda.gov/api/CPSFile/4735/329_MI_IR_Residue_and_Tillage_Management_No-Till-Management_Plan_1997"},
     "umn_alfalfa": {"title": "Univ. of Minnesota Extension, Alfalfa establishment: steps to maximize yield", "url": "https://extension.umn.edu/planting-forages/alfalfa-establishment-steps-maximize-yield"},
     "nass_2010": {"title": "USDA NASS, Field Crops Usual Planting and Harvesting Dates (Agricultural Handbook 628), Oct 2010", "url": "https://esmis.nal.usda.gov/concern/publications/vm40xr56k"},
     "sare_ch6": {"title": "SARE, Cover Crops (R. Myers), Ch. 6: Simple Steps for Getting Started with Cover Crops", "url": "https://www.sare.org/publications/cover-crop-book/ch-6-simple-steps-for-getting-started-with-cover-crops/"},
+    "jagromet_2019": {"title": "Journal of Agrometeorology (June 2019), Effect of date of sowing and rainfall on sustainability of yield and rainwater use efficiency in cereal crops under arid Alfisols (Anantapur, 2009-2014): yield highest when sown with monsoon onset in the first fortnight, lower with each later 15-day sowing", "url": "https://doaj.org/article/05771ae95a7e4fb2ad5cf2ca91671292"},
+    "nirval_1995": {"title": "Nirval et al. (1995), Management of sowing date of rainy-season crops for sustainable crop yield under dryland condition, Indian J. Agric. Sci. 65(3): best 15 June; pigeon pea and pearl millet can extend to 30 June, sorghum and groundnut lose yield after 30 June", "url": "https://epubs.icar.org.in/index.php/IJAgS/article/view/18202"},
     "plan_4_2": {"title": "Field Shift plan.md §4.2 (team assumption, to be confirmed with an extension source)", "url": null},
-    "botany": {"title": "Botanical family (Poaceae = grass, Fabaceae = legume, Brassicaceae = brassica, Asteraceae = aster)", "url": null}
+    "botany": {"title": "Botanical family (Poaceae = grass, Fabaceae = legume, Brassicaceae = brassica, Asteraceae = aster, Euphorbiaceae = spurge); legumes fix N through root nodules", "url": null}
   },
-  "crops": [
-    {
-      "id": "corn", "name": "Corn (grain)", "family": "grass", "type": "cash",
-      "season_windows": {
-        "iowa": {"plant": ["04-25", "05-18"], "harvest": ["10-05", "11-09"]},
-        "kansas": {"plant": ["04-15", "05-15"], "harvest": ["09-10", "10-25"]}
-      },
+  "crops": {
+    "maize": {
+      "name": "Maize (corn, grain)", "family": "grass", "type": "cash",
       "kc": {"ini": 0.3, "mid": 1.20, "end": [0.35, 0.60]},
-      "max_height_m": 2,
       "rooting_depth_m": [1.0, 1.7], "depletion_p": 0.55,
-      "ky": 1.25,
+      "ky": 1.25, "drought_tolerance": null,
       "base_temp_c": 8, "gdd_required": 1472,
       "gdd_note": "2,650 F-days for a 110-day hybrid",
-      "heat_sensitive_stage": "reproductive", "heat_threshold_c": 35,
-      "n_effect": {"fixes_n": false, "season": "warm", "need_lb_n_per_unit": 1.6, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": {"warm": 0, "cool": 0}},
+      "heat": {"sensitive_stage": "reproductive", "threshold_c": 35, "kind": "failure"},
+      "n_effect": "heavy_feeder", "n_season": "warm",
       "residue_cover": "high",
       "soil_preferences": {"prefer": null, "avoid_textures": ["clay", "sand"], "needs_good_drainage": true, "ph": null},
       "soil_note": "FAO: does well on most soils but less so on very heavy dense clay and very sandy soils; susceptible to waterlogging.",
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "gdd_required": "isu_gdd_2025", "heat_threshold_c": "usda_tb1935", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
-      "todo": []
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "gdd_required": "isu_gdd_2025", "heat": "usda_tb1935", "n_effect": "isu_n_2008", "n_season": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"}
     },
-    {
-      "id": "soybean", "name": "Soybean", "family": "legume", "type": "cash",
-      "season_windows": {
-        "iowa": {"plant": ["05-08", "06-02"], "harvest": ["09-28", "10-20"]},
-        "kansas": {"plant": ["05-15", "06-20"], "harvest": ["10-01", "11-01"]}
-      },
+    "soybean": {
+      "name": "Soybean", "family": "legume", "type": "cash",
       "kc": {"ini": 0.4, "mid": 1.15, "end": 0.50},
-      "max_height_m": [0.5, 1.0],
       "rooting_depth_m": [0.6, 1.3], "depletion_p": 0.50,
-      "ky": 0.85,
+      "ky": 0.85, "drought_tolerance": null,
       "base_temp_c": 7, "gdd_required": null,
       "gdd_note": "Not applicable: FAO describes soybean as a short-day plant whose flowering depends on daylength.",
-      "heat_sensitive_stage": "reproductive", "heat_threshold_c": 39,
-      "n_effect": {"fixes_n": true, "season": "warm", "need_lb_n_per_unit": null, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": {"warm": -40, "cool": 0}},
+      "heat": {"sensitive_stage": "reproductive", "threshold_c": 39, "kind": "failure"},
+      "n_effect": "fixes", "n_season": null,
       "residue_cover": "low",
       "soil_preferences": {"prefer": null, "avoid_textures": ["sand"], "needs_good_drainage": true, "ph": [6.0, 6.5]},
       "soil_note": "FAO: wide range of soils except very sandy; sensitive to waterlogging; optimum pH 6 to 6.5.",
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "gdd_required": "fao_crop_info", "heat_threshold_c": "usda_tb1935", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
-      "todo": []
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "heat": "usda_tb1935", "n_effect": "botany", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"}
     },
-    {
-      "id": "winter_wheat", "name": "Winter wheat", "family": "grass", "type": "cash",
-      "season_windows": {
-        "iowa": {"plant": ["09-26", "10-15"], "harvest": ["07-06", "07-22"]},
-        "kansas": {"plant": ["09-15", "10-20"], "harvest": ["06-20", "07-05"]}
-      },
+    "winter_wheat": {
+      "name": "Wheat (winter-sown)", "family": "grass", "type": "cash",
       "kc": {"ini": 0.4, "mid": 1.15, "end": [0.25, 0.4]},
       "kc_note": "FAO row 'Winter wheat, with frozen soils'",
-      "max_height_m": 1,
       "rooting_depth_m": [1.5, 1.8], "depletion_p": 0.55,
-      "ky": 1.05,
+      "ky": 1.05, "drought_tolerance": null,
       "base_temp_c": 0, "gdd_required": null,
       "gdd_note": "Not applicable: winter wheat needs vernalization over winter, so a base-10 C season total does not describe it.",
-      "heat_sensitive_stage": "reproductive", "heat_threshold_c": 34,
-      "n_effect": {"fixes_n": false, "season": "cool", "need_lb_n_per_unit": 2.6, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": {"warm": 0, "cool": 0}},
+      "heat": {"sensitive_stage": "reproductive", "threshold_c": 34, "kind": "failure"},
+      "n_effect": null, "n_season": "cool",
       "residue_cover": "high",
       "soil_preferences": {"prefer": "medium", "avoid_textures": [], "needs_good_drainage": null, "ph": [6.0, 8.0]},
       "soil_note": "FAO: wide range of soils but medium textures are preferred; optimum pH 6 to 8.",
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "gdd_required": "fao_crop_info", "heat_threshold_c": "usda_tb1935", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
-      "todo": []
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "heat": "usda_tb1935", "n_season": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"}
     },
-    {
-      "id": "sorghum", "name": "Sorghum (grain)", "family": "grass", "type": "cash",
-      "season_windows": {
-        "kansas": {"plant": ["05-15", "06-20"], "harvest": ["09-25", "11-10"]}
-      },
-      "kc": {"ini": 0.3, "mid": [1.00, 1.10], "end": 0.55},
-      "max_height_m": [1, 2],
-      "rooting_depth_m": [1.0, 2.0], "depletion_p": 0.55,
-      "ky": 0.9,
-      "base_temp_c": 8, "gdd_required": null,
-      "heat_sensitive_stage": "reproductive", "heat_threshold_c": 35,
-      "n_effect": {"fixes_n": false, "season": "warm", "need_lb_n_per_unit": 2.2, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": {"warm": 0, "cool": 30}},
+    "oats": {
+      "name": "Oats (spring)", "family": "grass", "type": "cash",
+      "kc": {"ini": 0.3, "mid": 1.15, "end": 0.25},
+      "rooting_depth_m": [1.0, 1.5], "depletion_p": 0.55,
+      "rooting_note": "FAO-56 Table 22 has no oats row; spring wheat row used.",
+      "ky": null, "drought_tolerance": null,
+      "ky_note": "FAO-33 Table 1 has no oats row.",
+      "base_temp_c": null, "gdd_required": null,
+      "heat": null,
+      "n_effect": null, "n_season": "cool",
       "residue_cover": "high",
-      "soil_preferences": {"prefer": "light to medium", "avoid_textures": [], "needs_good_drainage": true, "ph": null},
-      "soil_note": "FAO: does well on most soils but better in light to medium textured soils; preferably well-aerated and well-drained.",
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "heat_threshold_c": "usda_tb1935", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
-      "todo": ["gdd_required (K-State sorghum GDD to maturity)"]
+      "soil_preferences": null,
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "n_season": "ksu_mf2586", "residue_cover": "nrcs_residue_2006"}
     },
-    {
-      "id": "alfalfa", "name": "Alfalfa (hay)", "family": "legume", "type": "perennial",
+    "alfalfa": {
+      "name": "Alfalfa (hay)", "family": "legume", "type": "perennial",
       "stand_years": [2, 3],
-      "season_windows": {
-        "iowa": {"plant": null, "harvest": ["05-30", "09-15"]},
-        "kansas": {"plant": null, "harvest": ["05-20", "10-15"]}
-      },
-      "season_note": "USDA lists cutting dates only; harvest window = cutting season. Treated as spring-seeded.",
       "kc": {"ini": 0.40, "mid": 0.95, "end": 0.90},
       "kc_note": "FAO row 'Alfalfa hay, averaged cutting effects'",
-      "max_height_m": 0.7,
       "rooting_depth_m": [1.0, 2.0], "depletion_p": 0.55,
-      "ky": 1.1,
+      "ky": 1.1, "drought_tolerance": null,
       "base_temp_c": null, "gdd_required": null,
-      "heat_sensitive_stage": null, "heat_threshold_c": null,
-      "heat_note": "Hay crop: no grain-set stage, so the reproductive failure temperature does not apply.",
-      "n_effect": {"fixes_n": true, "season": "cool", "need_lb_n_per_unit": null, "yield_unit": "ton", "next_crop_adjust_lb_n_ac": {"warm": -80, "cool": -40}},
+      "heat": null,
+      "heat_note": "Hay crop: no grain-set stage, so a reproductive failure temperature does not apply.",
+      "n_effect": "fixes", "n_season": null,
       "residue_cover": "high",
       "soil_preferences": {"prefer": null, "avoid_textures": [], "needs_good_drainage": true, "ph": [6.5, 7.0]},
       "soil_note": "UMN: prefers well-drained, deep soils; keeping pH between 6.5 and 7.0 is extremely important.",
-      "sources": {"family": "botany", "stand_years": "plan_4_2", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_mi_329", "soil_preferences": "umn_alfalfa"},
-      "todo": ["stand_years (confirm)", "spring seeding window", "base_temp_c"]
+      "sources": {"family": "botany", "stand_years": "plan_4_2", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "n_effect": "botany", "residue_cover": "nrcs_mi_329", "soil_preferences": "umn_alfalfa"}
     },
-    {
-      "id": "oats", "name": "Oats (spring)", "family": "grass", "type": "cash",
-      "season_windows": {
-        "iowa": {"plant": ["04-02", "05-02"], "harvest": ["07-17", "08-05"]},
-        "kansas": {"plant": ["03-05", "04-01"], "harvest": ["07-15", "08-01"]}
-      },
-      "kc": {"ini": 0.3, "mid": 1.15, "end": 0.25},
-      "max_height_m": 1,
-      "rooting_depth_m": [1.0, 1.5], "depletion_p": 0.55,
-      "ky": null,
-      "base_temp_c": null, "gdd_required": null,
-      "heat_sensitive_stage": "reproductive", "heat_threshold_c": null,
-      "n_effect": {"fixes_n": false, "season": "cool", "need_lb_n_per_unit": 1.3, "yield_unit": "bu", "next_crop_adjust_lb_n_ac": null},
+    "sorghum": {
+      "name": "Sorghum (grain)", "family": "grass", "type": "cash",
+      "kc": {"ini": 0.3, "mid": [1.00, 1.10], "end": 0.55},
+      "rooting_depth_m": [1.0, 2.0], "depletion_p": 0.55,
+      "ky": 0.9, "drought_tolerance": null,
+      "base_temp_c": 8, "gdd_required": null,
+      "heat": {"sensitive_stage": "reproductive", "threshold_c": 35, "kind": "failure"},
+      "n_effect": null, "n_season": "warm",
       "residue_cover": "high",
-      "soil_preferences": null,
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006"},
-      "todo": ["ky (FAO-33 has no oats row)", "base_temp_c", "heat_threshold_c", "next_crop_adjust_lb_n_ac (MF2586 lists no oats row)", "soil_preferences"]
+      "soil_preferences": {"prefer": "light to medium", "avoid_textures": [], "needs_good_drainage": true, "ph": null},
+      "soil_note": "FAO: does well on most soils but better in light to medium textured soils; preferably well-aerated and well-drained.",
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "heat": "usda_tb1935", "n_season": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"}
     },
-    {
-      "id": "sunflower", "name": "Sunflower", "family": "aster", "type": "cash",
-      "season_windows": {
-        "kansas": {"plant": ["05-25", "06-30"], "harvest": ["10-01", "11-15"]}
-      },
+    "sunflower": {
+      "name": "Sunflower", "family": "aster", "type": "cash",
       "kc": {"ini": 0.35, "mid": [1.0, 1.15], "end": 0.35},
-      "max_height_m": 2.0,
       "rooting_depth_m": [0.8, 1.5], "depletion_p": 0.45,
-      "ky": 0.95,
+      "ky": 0.95, "drought_tolerance": null,
       "base_temp_c": null, "gdd_required": null,
-      "heat_sensitive_stage": "reproductive", "heat_threshold_c": null,
-      "n_effect": {"fixes_n": false, "season": "warm", "need_lb_n_per_unit": 0.075, "yield_unit": "lb", "next_crop_adjust_lb_n_ac": {"warm": 0, "cool": 30}},
+      "heat": null,
+      "n_effect": null, "n_season": "warm",
       "residue_cover": "low",
       "soil_preferences": {"prefer": null, "avoid_textures": [], "needs_good_drainage": null, "ph": [6.0, 7.5]},
       "soil_note": "FAO: grown on a wide range of soils; under low rainfall needs a deep soil with good water holding capacity; optimum pH 6.0 to 7.5.",
-      "sources": {"family": "botany", "season_windows": "nass_2010", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "n_effect": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"},
-      "todo": ["base_temp_c", "gdd_required", "heat_threshold_c"]
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "n_season": "ksu_mf2586", "residue_cover": "nrcs_residue_2006", "soil_preferences": "fao_crop_info"}
     },
-    {
-      "id": "cereal_rye", "name": "Cereal rye", "family": "grass", "type": "cover",
+    "pearl_millet": {
+      "name": "Pearl millet", "family": "grass", "type": "cash",
+      "kc": {"ini": 0.3, "mid": 1.00, "end": 0.30},
+      "kc_note": "FAO row 'Millet'",
+      "rooting_depth_m": [1.0, 2.0], "depletion_p": 0.55,
+      "ky": null, "drought_tolerance": null,
+      "base_temp_c": null, "gdd_required": null,
+      "heat": null,
+      "n_effect": null, "n_season": null,
+      "residue_cover": null,
+      "soil_preferences": null,
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"}
+    },
+    "chickpea": {
+      "name": "Chickpea", "family": "legume", "type": "cash",
+      "kc": {"ini": 0.4, "mid": 1.00, "end": 0.35},
+      "rooting_depth_m": [0.6, 1.0], "depletion_p": 0.50,
+      "ky": null, "drought_tolerance": null,
+      "base_temp_c": null, "gdd_required": null,
+      "heat": null,
+      "n_effect": "fixes", "n_season": null,
+      "residue_cover": null,
+      "soil_preferences": null,
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "n_effect": "botany"}
+    },
+    "pigeon_pea": {
+      "name": "Pigeon pea", "family": "legume", "type": "cash",
+      "kc": null,
+      "kc_note": "FAO-56 Tables 11, 12 and 22 have no pigeon pea row.",
+      "rooting_depth_m": null, "depletion_p": null,
+      "ky": null, "drought_tolerance": null,
+      "base_temp_c": null, "gdd_required": null,
+      "heat": null,
+      "n_effect": "fixes", "n_season": null,
+      "residue_cover": null,
+      "soil_preferences": null,
+      "sources": {"family": "botany", "n_effect": "botany"}
+    },
+    "groundnut": {
+      "name": "Groundnut (peanut)", "family": "legume", "type": "cash",
+      "kc": {"ini": 0.4, "mid": 1.15, "end": 0.60},
+      "rooting_depth_m": [0.5, 1.0], "depletion_p": 0.50,
+      "ky": 0.70, "drought_tolerance": null,
+      "base_temp_c": 10, "gdd_required": null,
+      "heat": {"sensitive_stage": null, "threshold_c": 33, "kind": "yield_reduction"},
+      "heat_note": "FAO: optimum mean daily temperature 22 to 28 C; yield drops above 33 C and below 18 C.",
+      "n_effect": "fixes", "n_season": null,
+      "residue_cover": null,
+      "soil_preferences": {"prefer": "medium", "avoid_textures": [], "needs_good_drainage": true, "ph": null},
+      "soil_note": "FAO: well-drained, loose, friable medium textured soils; below pH 6 liming may be necessary.",
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "base_temp_c": "usda_tb1935", "heat": "fao_crop_info", "n_effect": "botany", "soil_preferences": "fao_crop_info"}
+    },
+    "rice": {
+      "name": "Rice", "family": "grass", "type": "cash",
+      "kc": {"ini": 1.05, "mid": 1.20, "end": [0.60, 0.90]},
+      "rooting_depth_m": [0.5, 1.0], "depletion_p": 0.20,
+      "depletion_note": "FAO-56: rice p is relative to saturation, not field capacity.",
+      "ky": null, "drought_tolerance": null,
+      "base_temp_c": 8, "gdd_required": null,
+      "heat": {"sensitive_stage": "reproductive", "threshold_c": [35, 36], "kind": "failure"},
+      "n_effect": null, "n_season": null,
+      "residue_cover": null,
+      "soil_preferences": null,
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "base_temp_c": "usda_tb1935", "heat": "usda_tb1935"}
+    },
+    "cassava": {
+      "name": "Cassava", "family": "spurge", "type": "cash",
+      "kc": {"ini": 0.3, "mid": 0.80, "end": 0.30},
+      "kc_note": "FAO row 'Cassava - year 1'",
+      "rooting_depth_m": [0.5, 0.8], "depletion_p": 0.35,
+      "ky": null, "drought_tolerance": null,
+      "base_temp_c": null, "gdd_required": null,
+      "heat": null,
+      "n_effect": null, "n_season": null,
+      "residue_cover": null,
+      "soil_preferences": null,
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"}
+    },
+    "cowpea": {
+      "name": "Cowpea", "family": "legume", "type": "cash",
+      "kc": {"ini": 0.4, "mid": 1.05, "end": [0.35, 0.60]},
+      "kc_note": "FAO row 'Green Gram and Cowpeas'",
+      "rooting_depth_m": [0.6, 1.0], "depletion_p": 0.45,
+      "ky": null, "drought_tolerance": null,
+      "base_temp_c": null, "gdd_required": null,
+      "heat": null,
+      "n_effect": "fixes", "n_season": null,
+      "residue_cover": null,
+      "soil_preferences": null,
+      "sources": {"family": "botany", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "n_effect": "botany"}
+    },
+    "cereal_rye": {
+      "name": "Cereal rye", "family": "grass", "type": "cover",
       "cover": {"timing": "late fall tolerated", "winter_hardy": true, "min_days_before_first_frost": 0},
       "cover_note": "min_days_before_first_frost = 0 is our reading of SARE's 'late fall is tolerated'; rye survives to spring even when planted late.",
       "kc": null, "rooting_depth_m": null, "depletion_p": null,
-      "sources": {"family": "botany", "cover": "sare_ch6"},
-      "todo": ["kc (no FAO cereal rye row)", "rooting_depth_m", "depletion_p", "n_effect", "residue_cover"]
+      "n_effect": null, "residue_cover": null,
+      "sources": {"family": "botany", "cover": "sare_ch6"}
     },
-    {
-      "id": "crimson_clover", "name": "Crimson clover", "family": "legume", "type": "cover",
+    "crimson_clover": {
+      "name": "Crimson clover", "family": "legume", "type": "cover",
       "cover": {"timing": "mid-fall, at least two weeks before average frost", "winter_hardy": false, "min_days_before_first_frost": 14},
       "cover_note": "SARE: overwinters in the southern Corn Belt but not the northern Corn Belt; treated as winter-killed in Iowa.",
       "kc": null, "rooting_depth_m": null, "depletion_p": null,
-      "sources": {"family": "botany", "cover": "sare_ch6"},
-      "todo": ["kc (FAO lists Berseem, not crimson clover)", "rooting_depth_m", "depletion_p", "n_effect (MF2586 lists red and sweet clover only)", "residue_cover"]
+      "n_effect": "fixes", "residue_cover": null,
+      "sources": {"family": "botany", "cover": "sare_ch6", "n_effect": "botany"}
     },
-    {
-      "id": "radish", "name": "Forage radish", "family": "brassica", "type": "cover",
+    "radish": {
+      "name": "Forage radish", "family": "brassica", "type": "cover",
       "cover": {"timing": "late summer to early fall", "winter_hardy": false, "min_days_before_first_frost": null},
       "kc": {"ini": 0.7, "mid": 0.90, "end": 0.85},
       "kc_note": "FAO row 'Radish' (garden radish) used as an analog for forage radish",
-      "max_height_m": 0.3,
       "rooting_depth_m": [0.3, 0.5], "depletion_p": 0.30,
-      "sources": {"family": "botany", "cover": "sare_ch6", "kc": "fao56_t12", "max_height_m": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"},
-      "todo": ["min_days_before_first_frost (SARE gives no number)", "n_effect", "residue_cover"]
+      "n_effect": null, "residue_cover": null,
+      "sources": {"family": "botany", "cover": "sare_ch6", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22"}
     }
-  ]
+  },
+  "packs": {
+    "us_midwest": {
+      "zone": "north_temperate",
+      "description": "Central Iowa corn belt (USDA dates for Iowa)",
+      "crops": {
+        "maize": {
+          "plant": ["04-25", "05-18"], "harvest": ["10-05", "11-09"],
+          "stage_days": {"ini": 30, "dev": 40, "mid": 50, "late": 50}, "stage_note": "FAO-56 Table 11 maize (grain), April, Idaho USA",
+          "n_need_kg_ha": 203, "n_note": "ISU MRTN 181 lb N/acre for corn after corn; the soybean credit below gives 124 after soybean",
+          "next_crop_n_adjust_kg_ha": {"warm": 0, "cool": 0},
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11", "n_need_kg_ha": "isu_n_2008", "next_crop_n_adjust_kg_ha": "ksu_mf2586"}
+        },
+        "soybean": {
+          "plant": ["05-08", "06-02"], "harvest": ["09-28", "10-20"],
+          "stage_days": {"ini": 20, "dev": [30, 35], "mid": 60, "late": 25}, "stage_note": "FAO-56 Table 11 soybeans, May, Central USA",
+          "n_need_kg_ha": null,
+          "next_crop_n_adjust_kg_ha": {"warm": -64, "cool": null}, "n_note": "ISU: corn after soybean needs 57 lb N/acre less than corn after corn (124 vs 181)",
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11", "next_crop_n_adjust_kg_ha": "isu_n_2008"}
+        },
+        "winter_wheat": {
+          "plant": ["09-26", "10-15"], "harvest": ["07-06", "07-22"],
+          "stage_days": {"ini": 160, "dev": 75, "mid": 75, "late": 25}, "stage_note": "FAO-56 Table 11 winter wheat, October, Idaho USA",
+          "n_need_kg_ha": null,
+          "next_crop_n_adjust_kg_ha": {"warm": 0, "cool": 0},
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11", "next_crop_n_adjust_kg_ha": "ksu_mf2586"}
+        },
+        "oats": {
+          "plant": ["04-02", "05-02"], "harvest": ["07-17", "08-05"],
+          "stage_days": {"ini": 20, "dev": 25, "mid": 60, "late": 30}, "stage_note": "FAO-56 Table 11 barley/oats/wheat, March/April, 35-45 deg latitude",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11"}
+        },
+        "alfalfa": {
+          "plant": null, "harvest": ["05-30", "09-15"],
+          "harvest_note": "USDA lists cutting dates only; harvest window = cutting season.",
+          "stage_days": {"ini": 10, "dev": 30, "mid": 25, "late": 10}, "stage_note": "FAO-56 Table 11 alfalfa 1st cutting cycle, Idaho USA (later cycles 5/20/10/10)",
+          "n_need_kg_ha": null,
+          "next_crop_n_adjust_kg_ha": {"warm": -90, "cool": -45}, "n_note": "K-State 'good stand' (2-5 plants/ft2): -80 lb warm, -40 lb cool",
+          "sources": {"harvest": "nass_2010", "stage_days": "fao56_t11", "next_crop_n_adjust_kg_ha": "ksu_mf2586"}
+        },
+        "cereal_rye": {"sources": {}},
+        "crimson_clover": {"sources": {}},
+        "radish": {"sources": {}}
+      }
+    },
+    "us_plains": {
+      "zone": "north_temperate",
+      "description": "Kansas wheat and sorghum belt (USDA dates for Kansas)",
+      "crops": {
+        "maize": {
+          "plant": ["04-15", "05-15"], "harvest": ["09-10", "10-25"],
+          "stage_days": {"ini": 30, "dev": 40, "mid": 50, "late": 30}, "stage_note": "FAO-56 Table 11 maize (grain), April, Spain/California",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": {"warm": 0, "cool": 0},
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11", "next_crop_n_adjust_kg_ha": "ksu_mf2586"}
+        },
+        "soybean": {
+          "plant": ["05-15", "06-20"], "harvest": ["10-01", "11-01"],
+          "stage_days": {"ini": 20, "dev": [30, 35], "mid": 60, "late": 25}, "stage_note": "FAO-56 Table 11 soybeans, May, Central USA",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": {"warm": -45, "cool": 0},
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11", "next_crop_n_adjust_kg_ha": "ksu_mf2586"}
+        },
+        "winter_wheat": {
+          "plant": ["09-15", "10-20"], "harvest": ["06-20", "07-05"],
+          "stage_days": {"ini": 160, "dev": 75, "mid": 75, "late": 25}, "stage_note": "FAO-56 Table 11 winter wheat, October, Idaho USA",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": {"warm": 0, "cool": 0},
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11", "next_crop_n_adjust_kg_ha": "ksu_mf2586"}
+        },
+        "sorghum": {
+          "plant": ["05-15", "06-20"], "harvest": ["09-25", "11-10"],
+          "stage_days": {"ini": 20, "dev": 35, "mid": 40, "late": 30}, "stage_note": "FAO-56 Table 11 sorghum, May/June, USA/Pakistan/Mediterranean",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": {"warm": 0, "cool": 34},
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11", "next_crop_n_adjust_kg_ha": "ksu_mf2586"}
+        },
+        "sunflower": {
+          "plant": ["05-25", "06-30"], "harvest": ["10-01", "11-15"],
+          "stage_days": {"ini": 25, "dev": 35, "mid": 45, "late": 25}, "stage_note": "FAO-56 Table 11 sunflower, April/May, Mediterranean/California (only row)",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": {"warm": 0, "cool": 34},
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11", "next_crop_n_adjust_kg_ha": "ksu_mf2586"}
+        },
+        "oats": {
+          "plant": ["03-05", "04-01"], "harvest": ["07-15", "08-01"],
+          "stage_days": {"ini": 20, "dev": 25, "mid": 60, "late": 30}, "stage_note": "FAO-56 Table 11 barley/oats/wheat, March/April, 35-45 deg latitude",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"plant": "nass_2010", "harvest": "nass_2010", "stage_days": "fao56_t11"}
+        },
+        "alfalfa": {
+          "plant": null, "harvest": ["05-20", "10-15"],
+          "harvest_note": "USDA lists cutting dates only; harvest window = cutting season.",
+          "stage_days": {"ini": 10, "dev": 30, "mid": 25, "late": 10}, "stage_note": "FAO-56 Table 11 alfalfa 1st cutting cycle, Idaho USA",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": {"warm": -90, "cool": -45},
+          "sources": {"harvest": "nass_2010", "stage_days": "fao56_t11", "next_crop_n_adjust_kg_ha": "ksu_mf2586"}
+        }
+      }
+    },
+    "south_temperate": {
+      "zone": "south_temperate",
+      "description": "Argentine Pampas-type sites (e.g. Pergamino)",
+      "crops": {
+        "soybean": {
+          "plant": null, "harvest": null,
+          "stage_days": {"ini": 20, "dev": [30, 35], "mid": 60, "late": 25}, "stage_note": "FAO-56 Table 11 soybeans, May, Central USA (no Southern Hemisphere row)",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"stage_days": "fao56_t11"}
+        },
+        "maize": {
+          "plant": null, "harvest": null,
+          "plant_note": "FAO GIEWS Argentina briefs: maize sowing starts early September, harvest from March; no full window found.",
+          "stage_days": {"ini": 30, "dev": 40, "mid": 50, "late": 30}, "stage_note": "FAO-56 Table 11 maize (grain), April, Spain/California",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"stage_days": "fao56_t11"}
+        },
+        "winter_wheat": {
+          "plant": null, "harvest": null,
+          "plant_note": "FAO GIEWS Argentina briefs: planting complete by end of August, harvest from late October/early November; no full window found.",
+          "stage_days": {"ini": 20, "dev": 60, "mid": 70, "late": 30}, "stage_note": "FAO-56 Table 11 winter wheat, December, California (mild-winter row)",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"stage_days": "fao56_t11"}
+        }
+      }
+    },
+    "semi_arid_tropics": {
+      "zone": "tropical",
+      "description": "Semi-arid monsoon tropics (e.g. Anantapur, India)",
+      "crops": {
+        "sorghum": {
+          "plant_after": {"event": "onset", "days": [0, 15]},
+          "plant_note": "Highest yield when sown with monsoon onset in the first fortnight; lower with each later 15-day sowing.",
+          "stage_days": {"ini": 20, "dev": 35, "mid": 40, "late": 30}, "stage_note": "FAO-56 Table 11 sorghum, May/June, USA/Pakistan/Mediterranean",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"plant_after": "jagromet_2019", "stage_days": "fao56_t11"}
+        },
+        "pearl_millet": {
+          "plant_after": {"event": "onset", "days": [0, 15]},
+          "plant_note": "Same Anantapur trial as sorghum; Nirval et al. found pearl millet tolerates sowing about 15 days later than the best date.",
+          "stage_days": {"ini": 15, "dev": 25, "mid": 40, "late": 25}, "stage_note": "FAO-56 Table 11 millet, June, Pakistan",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"plant_after": "jagromet_2019", "stage_days": "fao56_t11"}
+        },
+        "chickpea": {
+          "plant_after": null,
+          "plant_note": "Post-rainy (rabi) crop grown on stored soil water, so timing should be relative to the rainy-season end; no source found yet.",
+          "stage_days": null, "stage_note": "FAO-56 Table 11 has no chickpea row.",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {}
+        },
+        "pigeon_pea": {
+          "plant_after": {"event": "onset", "days": [0, 15]},
+          "plant_note": "Nirval et al.: best sown 15 June, can extend to 30 June without much loss; converted to a 15-day window from the best date, assumed to be the onset.",
+          "stage_days": null, "stage_note": "FAO-56 Table 11 has no pigeon pea row.",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"plant_after": "nirval_1995"}
+        },
+        "groundnut": {
+          "plant_after": {"event": "onset", "days": [0, 15]},
+          "plant_note": "Nirval et al.: best sown 15 June, much less yield after 30 June; converted to a 15-day window from the best date, assumed to be the onset.",
+          "stage_days": {"ini": 25, "dev": 35, "mid": 45, "late": 25}, "stage_note": "FAO-56 Table 11 groundnut, dry season, West Africa",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"plant_after": "nirval_1995", "stage_days": "fao56_t11"}
+        }
+      }
+    },
+    "humid_tropics": {
+      "zone": "tropical",
+      "description": "Humid tropics with a long rainy season",
+      "crops": {
+        "rice": {
+          "plant_after": null,
+          "stage_days": {"ini": 30, "dev": 30, "mid": 60, "late": 30}, "stage_note": "FAO-56 Table 11 rice, Tropics",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"stage_days": "fao56_t11"}
+        },
+        "maize": {
+          "plant_after": null,
+          "stage_days": {"ini": 20, "dev": 35, "mid": 40, "late": 30}, "stage_note": "FAO-56 Table 11 maize (grain), June, Nigeria (humid)",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"stage_days": "fao56_t11"}
+        },
+        "cassava": {
+          "plant_after": null,
+          "plant_note": "FAO-56 Table 11 lists cassava as planted in the rainy season, without a day window.",
+          "stage_days": {"ini": 20, "dev": 40, "mid": 90, "late": 60}, "stage_note": "FAO-56 Table 11 cassava year 1, rainy season, tropical regions",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"stage_days": "fao56_t11"}
+        },
+        "cowpea": {
+          "plant_after": null,
+          "stage_days": {"ini": 20, "dev": 30, "mid": 30, "late": 20}, "stage_note": "FAO-56 Table 11 green gram/cowpeas, March, Mediterranean (only row)",
+          "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
+          "sources": {"stage_days": "fao56_t11"}
+        }
+      }
+    }
+  }
 }
