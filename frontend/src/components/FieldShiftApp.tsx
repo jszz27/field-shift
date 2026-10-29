@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
-import type { Point } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { api, type DemoSitesResponse, type Point } from "@/lib/api";
 import ClimateShiftPanel from "./ClimateShiftPanel";
 import InputsPanel, { type Recommendation } from "./InputsPanel";
 import ResultsPanel from "./ResultsPanel";
@@ -19,7 +19,12 @@ export default function FieldShiftApp() {
   const [point, setPoint] = useState<Point | null>(null);
   const [result, setResult] = useState<Recommendation | null>(null);
   const [tab, setTab] = useState<Tab>("climate");
+  const [demo, setDemo] = useState<DemoSitesResponse | null>(null);
   const pointKey = point ? `${point.lat},${point.lon}` : "";
+
+  useEffect(() => {
+    api.demoSites().then(setDemo, () => setDemo(null));  // the buttons are a shortcut: hide them if this fails
+  }, []);
 
   function pick(p: Point) {
     setPoint(p);
@@ -99,6 +104,31 @@ export default function FieldShiftApp() {
             </dl>
           ) : (
             <p className="mt-3 text-sm text-zinc-600">Click the map to drop a pin on your field.</p>
+          )}
+          {demo && demo.sites.length > 0 && (
+            <div className="mt-3 text-sm">
+              <p className="text-zinc-600">
+                Or try a demo field:
+                {demo.offline && (
+                  <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
+                    Offline demo mode
+                  </span>
+                )}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {demo.sites.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => pick({ lat: s.lat, lon: s.lon })}
+                    aria-pressed={point?.lat === s.lat && point?.lon === s.lon}
+                    className="rounded-md border border-zinc-300 px-2.5 py-1 hover:border-green-700 aria-pressed:border-green-700 aria-pressed:bg-green-50"
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
           {point && <InputsPanel key={pointKey} point={point} onResult={showResult} />}
         </aside>

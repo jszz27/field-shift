@@ -5,9 +5,11 @@ period. The climate zone decides which indicators apply:
   north_temperate - calendar year, growing season May–Sep, frost split at Jul 1
   south_temperate - season year Jul–Jun labelled by its start year, growing
                     season Nov–Mar, frost split at Jan 1
-  tropical        - no frost; the season is the rainy season, found with the
-                    FAO rain-vs-ET0 rule. The season year starts in the
-                    driest month so no rainy season is cut by the calendar.
+  tropical        - frost-free in most years, at any latitude (the tropics,
+                    but also e.g. Bangladesh or south Florida); the season is
+                    the rainy season, found with the FAO rain-vs-ET0 rule. The
+                    season year starts in the driest month so no rainy season
+                    is cut by the calendar.
 """
 import numpy as np
 import pandas as pd
@@ -23,7 +25,6 @@ FROST_TEMP = 0.0                 # °C, daily min
 DRY_DAY_RAIN = 1.0               # mm/day
 
 # Zone classification
-TROPIC_LAT = 23.44        # Tropics of Cancer/Capricorn (Earth's axial tilt)
 FROST_YEAR_SHARE = 0.5    # temperate if frost occurs in at least half the years ("most years")
 
 # Temperate zones: season-year start month, growing-season months, frost split month
@@ -49,9 +50,13 @@ def growing_degree_days(df):
 
 
 def classify_climate_zone(lat, df):
-    """'tropical' if within the tropics and frost-free in most years, else temperate by hemisphere."""
+    """'tropical' (seasons set by rain) if frost-free in most years, else temperate by hemisphere.
+
+    Latitude alone is not used: frost-free subtropics such as Bangladesh have no fall
+    frost to plan around, so the rainy-season rules fit them better.
+    """
     frost_years = (df["T2M_MIN"] <= FROST_TEMP).groupby(df.index.year).any()
-    if abs(lat) <= TROPIC_LAT and frost_years.mean() < FROST_YEAR_SHARE:
+    if frost_years.mean() < FROST_YEAR_SHARE:
         return "tropical"
     return "north_temperate" if lat >= 0 else "south_temperate"
 
@@ -190,10 +195,11 @@ def compare_periods(yearly):
     then = yearly.loc[THEN[0]:THEN[1]]
     now = yearly.loc[NOW[0]:NOW[1]]
     table = pd.DataFrame({"then": then.mean(), "now": now.mean()})
-    table.loc["season_rain_cv"] = [
-        period["season_rain"].std() / period["season_rain"].mean() * 100
-        for period in (then, now)
-    ]
+    if "season_rain" in yearly:  # absent where no rainy season was ever found (true deserts)
+        table.loc["season_rain_cv"] = [
+            period["season_rain"].std() / period["season_rain"].mean() * 100
+            for period in (then, now)
+        ]
     table["change"] = table["now"] - table["then"]
     table.attrs = dict(yearly.attrs)
     return table
@@ -256,8 +262,8 @@ def takeaways(table):
     period = f"{THEN[0]}-{THEN[1]} vs {NOW[0]}-{NOW[1]}"
     records = []
     for name, (unit, label) in LABELS.items():
-        if name not in table.index:
-            continue
+        if name not in table.index or table.loc[name, ["then", "now"]].isna().any():
+            continue  # not measurable here in one of the periods (e.g. no rainy season in a desert)
         then, now, change = (float(v) for v in table.loc[name, ["then", "now", "change"]])
         if unit == "date":
             shown = (day_of_season_to_date(then, year_start), day_of_season_to_date(now, year_start))

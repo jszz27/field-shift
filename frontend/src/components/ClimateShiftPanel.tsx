@@ -6,7 +6,7 @@ import { api, type ClimateIndicator, type ClimateShiftResponse, type Point } fro
 const ZONES: Record<ClimateShiftResponse["zone"], string> = {
   north_temperate: "Northern temperate: seasons set by frost",
   south_temperate: "Southern temperate: seasons set by frost (summer is Nov–Mar)",
-  tropical: "Tropical: seasons set by the rains",
+  tropical: "Frost-free: seasons set by the rains",
 };
 
 const UNITS: Record<string, string> = { "°C-days": "°C-days", days: "days", mm: "mm", "%": "%", seasons: "" };

@@ -53,7 +53,7 @@ export default function InputsPanel({ point, onResult }: Props) {
         if (!current) return;
         setCrops(c);
         const first = c.crops.find((crop) => crop.type !== "cover");
-        setBaseline(first ? [first.id] : []);
+        setBaseline(c.baseline ?? (first ? [first.id] : []));
       },
       (e: Error) => current && setCropsError(e.message),
     );

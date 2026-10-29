@@ -28,7 +28,8 @@ def frost_free(index):
     (-1.3, frost_free, "tropical"),
     (14.7, frost_free, "tropical"),
     (10.0, frost_every_winter, "north_temperate"),  # frosty tropical highland: frost rules apply
-    (30.0, frost_free, "north_temperate"),          # outside the tropics stays temperate
+    (30.0, frost_free, "tropical"),                 # frost-free subtropics: seasons set by rain
+    (-30.0, frost_free, "tropical"),
 ])
 def test_classify_climate_zone(lat, tmin, zone):
     assert classify_climate_zone(lat, daily("2001-01-01", "2010-12-31", tmin)) == zone

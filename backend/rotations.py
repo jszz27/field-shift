@@ -13,30 +13,51 @@ the fall-to-spring gap when the previous crop is harvested at least
 min_days_before_first_frost before the first fall frost. Soil suitability is
 not checked yet.
 """
+import functools
 import itertools
 
 import pandas as pd
 
-from climate_shift import compare_periods, day_of_year_to_date, yearly_indicators
-from crops import crops_for_pack
+from climate_shift import compare_periods, day_of_season_to_date, day_of_year_to_date, yearly_indicators
+from crops import crops_for_pack, load as load_crops
 from power_client import fetch_power_daily
 
 ROTATION_YEARS = (2, 3, 4, 5)  # 2 for corn-soybean, the plan's demo rotation
+
+
+FALL_PLANTED_DAY = 213  # 7 months into the season year: Aug 1 in the north, Jan 29 in the south
 
 
 def day_of_year(mm_dd):
     return pd.Timestamp(f"2001-{mm_dd}").dayofyear
 
 
+@functools.cache
+def season_start(region):
+    """Month the season year starts in for a pack: July for the Southern Hemisphere, else January."""
+    return 7 if load_crops()["packs"][region]["zone"] == "south_temperate" else 1
+
+
+def day_of_season(mm_dd, region):
+    """Days since the season year started (1 = first day); the day of year in the north."""
+    return (day_of_year(mm_dd) - day_of_year(f"{season_start(region):02d}-01")) % 365 + 1
+
+
+def window(dates, region):
+    """(start, end) days of season for an MM-DD window; end past 365 when it runs into the next season year."""
+    start, end = (day_of_season(d, region) for d in dates)
+    return start, end + 365 if end < start else end
+
+
 def typical_harvest(crop, region):
-    """Day of year in the middle of the most-active harvest window."""
-    start, end = crop["season_windows"][region]["harvest"]
-    return (day_of_year(start) + day_of_year(end)) // 2
+    """Day of season in the middle of the most-active harvest window."""
+    return sum(window(crop["season_windows"][region]["harvest"], region)) // 2
 
 
 def fall_planted(crop, region):
+    """Sown late in the season year and harvested in the next (winter wheat)."""
     plant = crop["season_windows"][region]["plant"]
-    return plant is not None and day_of_year(plant[0]) >= day_of_year("08-01")
+    return plant is not None and day_of_season(plant[0], region) >= FALL_PLANTED_DAY
 
 
 def is_canonical(seq):
@@ -72,10 +93,11 @@ def check(seq, crops, region):
         a, b = crops[a_id], crops[b_id]
         if fall_planted(b, region):
             harvest = typical_harvest(a, region)
-            plant_end = day_of_year(b["season_windows"][region]["plant"][1])
+            plant_end = window(b["season_windows"][region]["plant"], region)[1]
             if harvest > plant_end:
-                reasons.append(f"timing: {a['name']} harvest ~{day_of_year_to_date(harvest)} is after "
-                               f"{b['name']} planting ends {day_of_year_to_date(plant_end)}")
+                to_date = functools.partial(day_of_season_to_date, start_month=season_start(region))
+                reasons.append(f"timing: {a['name']} harvest ~{to_date(harvest)} is after "
+                               f"{b['name']} planting ends {to_date(plant_end)}")
     return list(dict.fromkeys(reasons))  # a cycle can hit the same rule twice
 
 

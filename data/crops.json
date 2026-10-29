@@ -27,6 +27,7 @@
     "nrcs_mi_329": {"title": "USDA NRCS Michigan, 329 Residue and Tillage Management, No-Till Management Plan: fragile vs non-fragile residues", "url": "https://efotg.sc.egov.usda.gov/api/CPSFile/4735/329_MI_IR_Residue_and_Tillage_Management_No-Till-Management_Plan_1997"},
     "umn_alfalfa": {"title": "Univ. of Minnesota Extension, Alfalfa establishment: steps to maximize yield", "url": "https://extension.umn.edu/planting-forages/alfalfa-establishment-steps-maximize-yield"},
     "nass_2010": {"title": "USDA NASS, Field Crops Usual Planting and Harvesting Dates (Agricultural Handbook 628), Oct 2010", "url": "https://esmis.nal.usda.gov/concern/publications/vm40xr56k"},
+    "sacks_2010": {"title": "Sacks, Deryng, Foley & Ramankutty (2010), Crop planting dates: an analysis of global patterns, Global Ecology and Biogeography 19:607-620 (SAGE Crop Calendar Dataset, raw data)", "url": "https://sage.nelson.wisc.edu/data-and-models/datasets/crop-calendar-dataset"},
     "sare_ch6": {"title": "SARE, Cover Crops (R. Myers), Ch. 6: Simple Steps for Getting Started with Cover Crops", "url": "https://www.sare.org/publications/cover-crop-book/ch-6-simple-steps-for-getting-started-with-cover-crops/"},
     "jagromet_2019": {"title": "Journal of Agrometeorology (June 2019), Effect of date of sowing and rainfall on sustainability of yield and rainwater use efficiency in cereal crops under arid Alfisols (Anantapur, 2009-2014): yield highest when sown with monsoon onset in the first fortnight, lower with each later 15-day sowing", "url": "https://doaj.org/article/05771ae95a7e4fb2ad5cf2ca91671292"},
     "nirval_1995": {"title": "Nirval et al. (1995), Management of sowing date of rainy-season crops for sustainable crop yield under dryland condition, Indian J. Agric. Sci. 65(3): best 15 June; pigeon pea and pearl millet can extend to 30 June, sorghum and groundnut lose yield after 30 June", "url": "https://epubs.icar.org.in/index.php/IJAgS/article/view/18202"},
@@ -349,24 +350,25 @@
       "description": "Argentine Pampas-type sites (e.g. Pergamino)",
       "crops": {
         "soybean": {
-          "plant": null, "harvest": null,
+          "plant": ["10-30", "12-30"], "harvest": ["03-30", "05-30"],
+          "plant_note": "Sacks et al. 2010, Argentina national row, Soybeans (first crop; source: MWCACP Updates). Double-crop soybean after wheat (Jan 1-Feb 5) is not modelled.",
           "stage_days": {"ini": 20, "dev": [30, 35], "mid": 60, "late": 25}, "stage_note": "FAO-56 Table 11 soybeans, May, Central USA (no Southern Hemisphere row)",
           "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
-          "sources": {"stage_days": "fao56_t11"}
+          "sources": {"plant": "sacks_2010", "harvest": "sacks_2010", "stage_days": "fao56_t11"}
         },
         "maize": {
-          "plant": null, "harvest": null,
-          "plant_note": "FAO GIEWS Argentina briefs: maize sowing starts early September, harvest from March; no full window found.",
+          "plant": ["09-09", "12-06"], "harvest": ["03-01", "05-30"],
+          "plant_note": "Sacks et al. 2010, Argentina national row, Maize (source: Avg GMu).",
           "stage_days": {"ini": 30, "dev": 40, "mid": 50, "late": 30}, "stage_note": "FAO-56 Table 11 maize (grain), April, Spain/California",
           "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
-          "sources": {"stage_days": "fao56_t11"}
+          "sources": {"plant": "sacks_2010", "harvest": "sacks_2010", "stage_days": "fao56_t11"}
         },
         "winter_wheat": {
-          "plant": null, "harvest": null,
-          "plant_note": "FAO GIEWS Argentina briefs: planting complete by end of August, harvest from late October/early November; no full window found.",
+          "plant": ["05-07", "08-21"], "harvest": ["10-31", "01-22"],
+          "plant_note": "Sacks et al. 2010, Argentina national row, Wheat (Winter; source: Avg GMu). Both windows cross a season-year or calendar boundary.",
           "stage_days": {"ini": 20, "dev": 60, "mid": 70, "late": 30}, "stage_note": "FAO-56 Table 11 winter wheat, December, California (mild-winter row)",
           "n_need_kg_ha": null, "next_crop_n_adjust_kg_ha": null,
-          "sources": {"stage_days": "fao56_t11"}
+          "sources": {"plant": "sacks_2010", "harvest": "sacks_2010", "stage_days": "fao56_t11"}
         }
       }
     },

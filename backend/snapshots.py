@@ -34,7 +34,8 @@ def read(kind, lat, lon):
     site = site_for(lat, lon)
     path = SNAPSHOT_DIR / str(site) / f"{kind}.json"
     if site is None or not path.exists():
-        raise FileNotFoundError(f"OFFLINE=1 but no '{kind}' snapshot for ({lat}, {lon})")
+        raise FileNotFoundError(f"Offline demo mode: only the demo fields have saved data "
+                                f"(no '{kind}' snapshot for {lat}, {lon}). Pick a demo field.")
     return json.loads(path.read_text(encoding="utf-8"))
 
 

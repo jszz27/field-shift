@@ -52,6 +52,22 @@ def test_crops_for_point(client):
     assert client.get("/api/crops", params={**AMES, "pack": "mars"}).status_code == 422
 
 
+def test_demo_sites(client):
+    body = client.get("/api/demo-sites").json()
+    assert body["offline"] is True
+    assert {"id": "niamey_ne", "name": "Niamey area, Niger", "lat": 13.51, "lon": 2.16} in body["sites"]
+
+
+def test_crops_prefill_demo_baseline(client):
+    assert client.get("/api/crops", params=NIAMEY).json()["baseline"] == ["pearl_millet"]
+    assert client.get("/api/crops", params=AMES).json()["baseline"] == ["maize"]
+
+
+def test_offline_error_names_the_fix(client):
+    body = client.get("/api/climate-shift", params={"lat": 10.0, "lon": 10.0})
+    assert body.status_code == 503 and "Pick a demo field" in body.json()["detail"]
+
+
 def test_methodology_lists_formulas_inputs_and_sources(client):
     body = client.get("/api/methodology", params={"pack": "us_midwest"}).json()
     assert set(body["indicators"]) == {"n_balance", "soil_cover", "diversity", "water_demand", "climate_risk", "simplicity"}
@@ -82,6 +98,13 @@ def test_reasons_skip_et0_change_the_climate_card_calls_small(client):
     assert any("Irrigation gap" in t for t in reasons) and not any("ET0" in t for t in reasons)
     ames = client.post("/api/recommend", json={**AMES, "baseline": ["maize"]}).json()
     assert any("yearly ET0 has risen 46 mm" in t for r in ames["rotations"] for t in r["reasons"])
+
+
+def test_data_gaps_drop_a_measure_instead_of_leaving_one_rotation(client):
+    # Sorghum has a sourced residue class but most partner crops do not: soil cover would leave 1 rotation
+    body = client.post("/api/recommend", json={**NIAMEY, "baseline": ["sorghum"]}).json()
+    assert len(body["rotations"]) == 5 and "soil_cover" not in body["ranked_on"]
+    assert "water_demand" in body["ranked_on"]
 
 
 def test_recommend_weights_and_years(client):

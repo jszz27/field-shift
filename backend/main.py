@@ -140,6 +140,13 @@ def hazards(lat: Lat, lon: Lon):
     return clean(fetch_hazards(lat, lon))
 
 
+@app.get("/api/demo-sites")
+def demo_sites():
+    """The pre-baked demo fields, which also work with OFFLINE=1."""
+    return {"sites": [{k: s[k] for k in ("id", "name", "lat", "lon")} for s in snapshots.load_sites()["sites"]],
+            "offline": snapshots.offline()}
+
+
 @app.get("/api/crops")
 def crops(lat: Lat, lon: Lon, pack: str | None = None):
     """The crop pack used for the point, so the UI can offer its crops for current practice."""
@@ -148,10 +155,14 @@ def crops(lat: Lat, lon: Lon, pack: str | None = None):
     if pack not in load_crops()["packs"]:
         raise ValueError(f"Unknown crop pack {pack!r}")
     in_pack = crops_for_pack(pack)
+    site_id = snapshots.site_for(lat, lon)
+    site = next((s for s in snapshots.load_sites()["sites"] if s["id"] == site_id), None)
     return clean({
         "zone": zone, "pack": pack,
         "crops": [{"id": c, "name": crop["name"], "family": crop["family"], "type": crop["type"]}
                   for c, crop in in_pack.items()],
+        # A demo field's current practice, to prefill the form; None elsewhere
+        "baseline": site["baseline_practice"] if site else None,
     })
 
 

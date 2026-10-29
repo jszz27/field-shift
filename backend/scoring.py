@@ -28,13 +28,13 @@ water balance (no Kc for rye or clover).
 import numpy as np
 import pandas as pd
 
-from climate_shift import NOW, compare_periods, day_of_season_to_date, is_small, yearly_indicators
+from climate_shift import NOW, compare_periods, day_of_season, day_of_season_to_date, is_small, yearly_indicators
 from crops import crops_for_pack
 from et0 import daily_et0
 from power_client import fetch_power_daily
 import snapshots
 from crops import load as load_crops
-from rotations import check, cover_options, day_of_year, fall_planted, generate, typical_harvest
+from rotations import check, cover_options, fall_planted, generate, typical_harvest, window
 from soil_client import get_soil
 
 RESIDUE_WEIGHT = {"high": 0.5, "medium": 0.25, "low": 0.0}  # team assumption: residue counts half at most
@@ -101,7 +101,8 @@ FINAL_FORMULA = (
     "Each measure is scaled 0-100 within the rotations compared: 100 x (value - worst) / (best - worst), so 100 is the "
     "best in the set. Group scores: Soil health = mean of nitrogen, soil cover and diversity; Water conservation = water "
     "demand; Yield stability = climate risk; Simplicity = simplicity. Final = sum of (slider weight x group score) / sum "
-    "of weights, using only the measures that can also be scored for your current practice."
+    "of weights, using only the measures that can also be scored for your current practice. If missing crop data "
+    "would leave fewer than 5 rotations comparable, the measure the fewest rotations have is left out of the ranking."
 )
 # Location data the indicators read (crop values cite crops.json sources instead)
 SITE_SOURCES = {
@@ -114,6 +115,8 @@ SITE_SOURCES = {
     "manual_soil": {"title": "FAO-56 Table 19 typical soil water by texture (manual choice)",
                     "url": "https://www.fao.org/4/x0490e/x0490e0c.htm"},
 }
+
+MIN_COMPARABLE = 5  # rank at least this many rotations, dropping data-gap measures if needed
 
 # Pack used when the request names none and the point is not a demo site
 ZONE_PACK = {"north_temperate": "us_midwest", "south_temperate": "south_temperate", "tropical": "semi_arid_tropics"}
@@ -194,6 +197,13 @@ def site_context(lat, lon, pack_id=None, soil=None):
     pack_id = pack_id or default_pack(lat, lon, table.attrs["zone"])
     if pack_id not in load_crops()["packs"]:
         raise ValueError(f"Unknown crop pack {pack_id!r}")
+    zone = table.attrs["zone"]
+    if zone == "tropical" and ("rain_onset" not in table.index or pd.isna(table.loc["rain_onset", "now"])):
+        raise ValueError("No rain-fed growing season here: in 2005-2024 rain never reached half the "
+                         "evaporation demand for long enough to grow a crop. Field Shift plans rain-fed "
+                         "rotations; irrigated farming is not modelled yet.")
+    if zone != "tropical" and pd.isna(table.loc["first_fall_frost", "now"]):
+        raise ValueError("No regular fall frost here to plan the season around.")
     soil = soil or get_soil(lat, lon)
     if soil is None:
         raise ValueError("No soil data for this point: pass a manual soil profile")
@@ -209,14 +219,13 @@ def planting_dates(crop, site):
     entry, yearly = crop["pack"], site["yearly"]
     years = [y for y in range(NOW[0], NOW[1] + 1) if y in yearly.index]
     total = round(sum(mid(entry["stage_days"][s]) for s in STAGES))
-    if site["zone"] != "tropical":
+    if site["zone"] != "tropical":  # days count from the season year's start: Jan 1 north, Jul 1 south
         if crop["type"] == "perennial":  # green from last spring frost to first fall frost
             rows = yearly.loc[years, ["last_spring_frost", "first_fall_frost"]].dropna()
-            return [(pd.Timestamp(y, 1, 1) + pd.Timedelta(days=int(r.last_spring_frost)),
+            return [(pd.Timestamp(y, site["year_start"], 1) + pd.Timedelta(days=int(r.last_spring_frost)),
                      int(r.first_fall_frost - r.last_spring_frost)) for y, r in rows.iterrows()], False
-        start, end = (day_of_year(d) for d in entry["plant"])
-        doy = (start + end) // 2
-        return [(pd.Timestamp(y, 1, 1) + pd.Timedelta(days=doy - 1), total) for y in years], False
+        day = sum(window(entry["plant"], site["pack"])) // 2
+        return [(pd.Timestamp(y, site["year_start"], 1) + pd.Timedelta(days=day - 1), total) for y in years], False
     after = entry.get("plant_after")
     delay = mid(after["days"]) if after else 0
     mean_onset = site["table"].loc["rain_onset", "now"]
@@ -239,7 +248,7 @@ def crop_metrics(crop, site):
     df, et0 = site["df"], site["et0"]
     seasons = [(s, n) for s, n in seasons if s + pd.Timedelta(days=n) <= df.index[-1]]
     stage_days = [mid(entry["stage_days"][s]) for s in STAGES]
-    out["plant_doy"] = round(np.mean([s.dayofyear for s, _ in seasons]))
+    out["plant_doy"] = round(np.mean(day_of_season(pd.DatetimeIndex([s for s, _ in seasons]), site["year_start"])))
     out["plant_rel"] = out["plant_doy"] - (365 if fall_planted(crop, site["pack"]) else 0)
     out["total_days"] = round(np.mean([n for _, n in seasons]))
 
@@ -297,7 +306,8 @@ def soil_cover(seq, covers, crops, info):
         prev, nxt = seq[i - 1], seq[(i + 1) % n]
         if crop["type"] == "perennial":
             start = 365 * i + (0 if prev == crop_id else crop_info["plant_doy"])
-            end = 365 * i + (365 if nxt == crop_id else day_of_year(crop["pack"]["harvest"][1]))
+            region = next(iter(crop["season_windows"]))  # the pack this crop entry came from
+            end = 365 * i + (365 if nxt == crop_id else window(crop["pack"]["harvest"], region)[1])
         else:
             start = 365 * i + crop_info["plant_rel"]
             end = start + crop_info["total_days"]
@@ -395,8 +405,8 @@ def cover_story(r, site):
         return ""
     now, then, a, cover = min(fits)
     return (f"; {crops[cover]['name'].lower()} fits after {crops[a]['name'].split(' (')[0].lower()} because the "
-            f"first fall frost now comes {day_of_season_to_date(table.loc['first_fall_frost', 'now'])} instead of "
-            f"{day_of_season_to_date(table.loc['first_fall_frost', 'then'])}, "
+            f"first fall frost now comes {day_of_season_to_date(table.loc['first_fall_frost', 'now'], site['year_start'])} "
+            f"instead of {day_of_season_to_date(table.loc['first_fall_frost', 'then'], site['year_start'])}, "
             f"leaving {now:.0f} days to establish it instead of {then:.0f}")
 
 
@@ -471,12 +481,17 @@ def check_crops(site, seq):
 
 def score_against_baseline(site, baseline, weights, rotations):
     """Score the baseline and [(rotation, covers)] as one set. Final scores use only the
-    indicators scored for the baseline; rotations missing one of them get final None."""
+    indicators scored for the baseline; rotations missing one of them get final None.
+    If crop-data gaps leave fewer than MIN_COMPARABLE rotations, the indicator the fewest
+    rotations have is dropped (one at a time) so the ranking still compares like with like."""
     check_crops(site, baseline)
     base = evaluate(site, baseline, [None] * len(baseline))
     scored = [evaluate(site, rotation, covers) for rotation, covers in rotations]
     score_set([base] + scored)
     indicators = {k for k, v in base["scores"].items() if v is not None}
+    have = lambda k: sum(r["scores"][k] is not None for r in scored)
+    while len(indicators) > 1 and sum(all(r["scores"][k] is not None for k in indicators) for r in scored) < MIN_COMPARABLE:
+        indicators.remove(min(indicators, key=have))
     for r in [base] + scored:
         comparable = all(r["scores"][k] is not None for k in indicators)
         r["final"] = final_score(r["scores"], weights, indicators) if comparable else None

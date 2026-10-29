@@ -17,7 +17,12 @@ export type SoilResponse = { profile: SoilProfile | null; source: string | null;
 
 export type Crop = { id: string; name: string; family: string; type: "cash" | "cover" | "perennial" };
 
-export type CropsResponse = { zone: string; pack: string; crops: Crop[] };
+// baseline: a demo field's current practice (crop ids), null elsewhere
+export type CropsResponse = { zone: string; pack: string; crops: Crop[]; baseline: string[] | null };
+
+export type DemoSite = Point & { id: string; name: string };
+
+export type DemoSitesResponse = { sites: DemoSite[]; offline: boolean };
 
 export type Weights = { soil_health: number; water: number; stability: number; simplicity: number };
 
@@ -133,6 +138,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const query = (p: Point) => `lat=${p.lat}&lon=${p.lon}`;
 
 export const api = {
+  demoSites: () => request<DemoSitesResponse>("/api/demo-sites"),
   climateShift: (p: Point) => request<ClimateShiftResponse>(`/api/climate-shift?${query(p)}`),
   soil: (p: Point) => request<SoilResponse>(`/api/soil?${query(p)}`),
   crops: (p: Point) => request<CropsResponse>(`/api/crops?${query(p)}`),
