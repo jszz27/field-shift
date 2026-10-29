@@ -28,7 +28,7 @@ water balance (no Kc for rye or clover).
 import numpy as np
 import pandas as pd
 
-from climate_shift import NOW, compare_periods, day_of_season_to_date, yearly_indicators
+from climate_shift import NOW, compare_periods, day_of_season_to_date, is_small, yearly_indicators
 from crops import crops_for_pack
 from et0 import daily_et0
 from power_client import fetch_power_daily
@@ -417,10 +417,12 @@ def explain(r, base, site):
         candidates.append(("soil_cover", f"Soil is covered {m['soil_cover']:.0f}% of the year, vs "
                                          f"{b['soil_cover']:.0f}% for {name}{cover_story(r, site)}."))
     if m["water_demand"] is not None and b["water_demand"] is not None:
-        change = table.loc["et0", "change"]
+        then, change = table.loc["et0", ["then", "change"]]
+        # Same threshold as the Climate shift card, so a "no clear change" ET0 is not cited as a shift
+        shift = "" if is_small("mm", then, change) else (
+            f"; yearly ET0 has {'risen' if change > 0 else 'fallen'} {abs(change):.0f} mm since 1981-2000")
         candidates.append(("water_demand",
-            f"Irrigation gap of about {m['water_demand']:.0f} mm a year, vs {b['water_demand']:.0f} mm for {name}; "
-            f"yearly ET0 has {'risen' if change > 0 else 'fallen'} {abs(change):.0f} mm since 1981-2000."))
+            f"Irrigation gap of about {m['water_demand']:.0f} mm a year, vs {b['water_demand']:.0f} mm for {name}{shift}."))
     if m["yield_loss_pct"] is not None and b["yield_loss_pct"] is not None:
         spell = table.loc["longest_dry_spell"]
         candidates.append(("climate_risk",

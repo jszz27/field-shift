@@ -14,7 +14,6 @@ const MEASURES: Record<string, [string, string][]> = {
   diversity: [["diversity", "crops + families"]],
   water_demand: [["water_demand", "mm/yr irrigation gap"]],
   climate_risk: [["yield_loss_pct", "% yield loss"], ["heat_days", "heat days"]],
-  simplicity: [["simplicity", "crops (+1 perennial)"]],
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -112,8 +111,14 @@ export default function MethodologyPanel({ pack, zone, rotation, baseline, soil,
         const fields = [...ind.crop, ...ind.pack].filter((f) =>
           ids.some((id) => f === "type" || f in m.crops[id].library || f in m.crops[id].pack),
         );
-        const describe = (r: ScoredRotation) =>
-          MEASURES[key].map(([k, unit]) => `${format(rounded(r.metrics[k]))} ${unit}`).join(", ");
+        const describe = (r: ScoredRotation) => {
+          if (key === "simplicity") {
+            const n = new Set(r.rotation).size;
+            const perennial = r.rotation.some((id) => m.crops[id]?.type === "perennial");
+            return `${n} crop${n === 1 ? "" : "s"}${perennial ? " + 1 for a perennial" : ""}`;
+          }
+          return MEASURES[key].map(([k, unit]) => `${format(rounded(r.metrics[k]))} ${unit}`).join(", ");
+        };
         const sites = ind.site.map((s) => siteInputs(s, soil, zone)).filter((s): s is [string, string] => !!s);
         sites.forEach(([, source]) => used.add(source));
         const score = rotation.scores[key];

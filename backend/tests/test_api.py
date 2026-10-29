@@ -75,6 +75,15 @@ def test_recommend(client):
     assert body["baseline"]["label"] == "continuous maize" and body["baseline"]["final"] == 46.1
 
 
+def test_reasons_skip_et0_change_the_climate_card_calls_small(client):
+    # Niamey ET0 2585 -> 2512 mm (-2.8%) reads "no clear change" on the Climate shift card
+    body = client.post("/api/recommend", json={**NIAMEY, "baseline": ["pearl_millet"]}).json()
+    reasons = [text for r in body["rotations"] for text in r["reasons"]]
+    assert any("Irrigation gap" in t for t in reasons) and not any("ET0" in t for t in reasons)
+    ames = client.post("/api/recommend", json={**AMES, "baseline": ["maize"]}).json()
+    assert any("yearly ET0 has risen 46 mm" in t for r in ames["rotations"] for t in r["reasons"])
+
+
 def test_recommend_weights_and_years(client):
     req = {**AMES, "baseline": ["maize"], "years": [2], "weights": {"soil_health": 1, "water": 0, "stability": 0, "simplicity": 0}}
     body = client.post("/api/recommend", json=req).json()
