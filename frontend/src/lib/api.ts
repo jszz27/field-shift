@@ -124,7 +124,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`${API_URL}${path}`, init);
   } catch {
-    throw new Error(`Cannot reach the Field Shift API at ${API_URL}. Is the backend running?`);
+    throw new Error(
+      "Cannot reach the Field Shift server. If nobody has used it for a while it may be waking up: wait a minute, then try again.",
+    );
   }
   const body = await res.json().catch(() => null);
   if (!res.ok) {
