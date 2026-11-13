@@ -5,13 +5,15 @@ last year is followed by the first. Each rejection names the rule it broke:
   repeat  - an annual crop grown two years in a row
   stand   - a perennial (alfalfa) stand shorter or longer than its stand_years
   timing  - a fall-planted crop (winter wheat) after a crop harvested too late
+  soil    - a crop whose soil_preferences.exclude_if_drainage lists the field's
+            SSURGO drainage class (alfalfa on poorly drained soil)
 Two different crops from the same family in a row (e.g. oats -> corn) are
 allowed here and penalized by the Diversity score instead (Step 8), since
 small grain -> corn is a standard Corn Belt rotation. Crops and their
 season windows come from the region pack (crops.py). Cover crops fill
 the fall-to-spring gap when the previous crop is harvested at least
-min_days_before_first_frost before the first fall frost. Soil suitability is
-not checked yet.
+min_days_before_first_frost before the first fall frost. Drainage is the only
+soil property checked; it is known only where SSURGO covers the field.
 """
 import functools
 import itertools
@@ -75,9 +77,14 @@ def transitions(seq):
     return list(zip(seq, seq[1:] + seq[:1]))
 
 
-def check(seq, crops, region):
-    """Reasons the rotation breaks a rule; empty means it is valid."""
+def check(seq, crops, region, drainage=None):
+    """Reasons the rotation breaks a rule; empty means it is valid. drainage is the
+    field's SSURGO drainage class, or None where it is unknown."""
     reasons = []
+    for crop_id in dict.fromkeys(seq):
+        excluded = (crops[crop_id].get("soil_preferences") or {}).get("exclude_if_drainage") or []
+        if drainage in excluded:
+            reasons.append(f"soil: {crops[crop_id]['name']} does not suit {drainage.lower()} soil")
     for crop_id, years in runs(seq):
         crop = crops[crop_id]
         if crop["type"] == "perennial":
@@ -112,7 +119,7 @@ def cover_options(a_id, b_id, crops, region, first_fall_frost):
             and harvest <= first_fall_frost - c["cover"]["min_days_before_first_frost"]]
 
 
-def generate(region, first_fall_frost):
+def generate(region, first_fall_frost, drainage=None):
     """All valid rotations (with cover options per gap) and all rejected ones with reasons."""
     crops = crops_for_pack(region)
     pool = sorted(c["id"] for c in crops.values() if c["type"] != "cover")
@@ -121,7 +128,7 @@ def generate(region, first_fall_frost):
         for seq in itertools.product(pool, repeat=n):
             if not is_canonical(seq):
                 continue
-            reasons = check(seq, crops, region)
+            reasons = check(seq, crops, region, drainage)
             if reasons:
                 rejected.append({"rotation": seq, "reasons": reasons})
             else:

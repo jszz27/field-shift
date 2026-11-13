@@ -14,7 +14,9 @@ Rotation-level indicators:
   soil_cover    - % of the cycle covered: crop or cover crop = 1, leftover
                   residue = RESIDUE_WEIGHT (team assumption)
   diversity     - distinct crops + distinct families
-  simplicity    - distinct crops, +1 if a perennial needs hay equipment
+  simplicity    - distinct crops, +1 if a perennial needs hay equipment, and
+                  +NEW_PERENNIAL_PENALTY more when the baseline has no perennial
+                  (team assumptions)
                   (team assumption)
 Scores are 0-100 relative to the rotations being compared (100 = best of the
 set). An indicator that needs a value no source gives is skipped, not guessed.
@@ -92,9 +94,11 @@ METHODOLOGY = {
         "assumptions": ["A hay crop (alfalfa) has no grain-set stage, so it gets 0 heat days."],
     },
     "simplicity": {
-        "name": "Simplicity", "unit": "crops (+1 for a perennial)", "better": "lower",
-        "formula": "Number of different crops, plus 1 if the rotation has a perennial hay crop that needs its own equipment.",
-        "crop": ["type"], "pack": [], "site": [], "assumptions": ["This penalty is a team assumption."],
+        "name": "Simplicity", "unit": "crops (+ perennial penalty)", "better": "lower",
+        "formula": "Number of different crops, plus 1 if the rotation has a perennial hay crop that needs its own "
+                   "equipment, plus 2 more if your current practice has no perennial (new machinery, a hay market "
+                   "and a multi-year stand to learn).",
+        "crop": ["type"], "pack": [], "site": [], "assumptions": ["Both penalties are team assumptions."],
     },
 }
 FINAL_FORMULA = (
@@ -117,6 +121,7 @@ SITE_SOURCES = {
 }
 
 MIN_COMPARABLE = 5  # rank at least this many rotations, dropping data-gap measures if needed
+NEW_PERENNIAL_PENALTY = 2  # team assumption: simplicity cost of adding hay to a grain-only farm
 
 # Pack used when the request names none and the point is not a demo site
 ZONE_PACK = {"north_temperate": "us_midwest", "south_temperate": "south_temperate", "tropical": "semi_arid_tropics"}
@@ -469,7 +474,7 @@ def first_fall_frost(site):
 def candidates(site, years=None):
     """Valid rotations for the site's pack as (rotation, covers), using the first cover crop that fits."""
     return [(list(c["rotation"]), [opts[0] if opts else None for opts in c["covers"]])
-            for c in generate(site["pack"], first_fall_frost(site))["valid"]
+            for c in generate(site["pack"], first_fall_frost(site), site["soil"].get("drainage"))["valid"]
             if not years or len(c["rotation"]) in years]
 
 
@@ -487,6 +492,11 @@ def score_against_baseline(site, baseline, weights, rotations):
     check_crops(site, baseline)
     base = evaluate(site, baseline, [None] * len(baseline))
     scored = [evaluate(site, rotation, covers) for rotation, covers in rotations]
+    perennial = lambda seq: any(site["crops"][c]["type"] == "perennial" for c in seq)
+    if not perennial(baseline):  # a grain farm adding hay also needs new machinery and a hay buyer
+        for r in scored:
+            if perennial(r["rotation"]):
+                r["metrics"]["simplicity"] += NEW_PERENNIAL_PENALTY
     score_set([base] + scored)
     indicators = {k for k, v in base["scores"].items() if v is not None}
     have = lambda k: sum(r["scores"][k] is not None for r in scored)
@@ -504,7 +514,12 @@ def recommend(lat, lon, pack_id, baseline, weights=None, soil=None, top=5, years
     site = site_context(lat, lon, pack_id, soil)
     base, scored, indicators = score_against_baseline(site, baseline, weights, candidates(site, years))
     comparable = [r for r in scored if r["final"] is not None]
-    ranked = sorted(comparable, key=lambda r: r["final"], reverse=True)[:top]
+    # One rotation per crop set (alfalfa x3 -> maize and alfalfa x2 -> maize are one strategy):
+    # keep the best-scoring variant so different strategies reach the top
+    best = {}
+    for r in sorted(comparable, key=lambda r: r["final"], reverse=True):
+        best.setdefault(frozenset(r["rotation"]), r)
+    ranked = list(best.values())[:top]
     for r in ranked:
         r["reasons"] = explain(r, base, site)
     return {"zone": site["zone"], "pack": site["pack"], "soil": site["soil"], "baseline": base,
@@ -524,7 +539,7 @@ def score_rotation(lat, lon, pack_id, baseline, rotation, covers=None, weights=N
     valid = candidates(site, years)
     base, scored, indicators = score_against_baseline(site, baseline, weights, valid + [(rotation, covers)])
     r = scored[-1]
-    r["rule_breaks"] = check(tuple(rotation), site["crops"], site["pack"])
+    r["rule_breaks"] = check(tuple(rotation), site["crops"], site["pack"], site["soil"].get("drainage"))
     r["reasons"] = explain(r, base, site)
     better = [x for x in scored[:-1] if x["final"] is not None and r["final"] is not None and x["final"] > r["final"]]
     ranked = r["final"] is not None and not r["rule_breaks"]  # a rotation that breaks a rule is scored, not ranked

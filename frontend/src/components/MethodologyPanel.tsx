@@ -114,8 +114,8 @@ export default function MethodologyPanel({ pack, zone, rotation, baseline, soil,
         const describe = (r: ScoredRotation) => {
           if (key === "simplicity") {
             const n = new Set(r.rotation).size;
-            const perennial = r.rotation.some((id) => m.crops[id]?.type === "perennial");
-            return `${n} crop${n === 1 ? "" : "s"}${perennial ? " + 1 for a perennial" : ""}`;
+            const penalty = (r.metrics.simplicity ?? n) - n;  // perennial penalties the backend added
+            return `${n} crop${n === 1 ? "" : "s"}${penalty > 0 ? ` + ${penalty} for a perennial` : ""}`;
           }
           return MEASURES[key].map(([k, unit]) => `${format(rounded(r.metrics[k]))} ${unit}`).join(", ");
         };

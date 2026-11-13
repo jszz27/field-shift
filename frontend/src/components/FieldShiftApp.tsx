@@ -90,21 +90,26 @@ export default function FieldShiftApp() {
         </div>
 
         <aside className="w-full border-t border-zinc-200 bg-white p-4 sm:p-6 lg:w-96 lg:overflow-y-auto lg:border-l lg:border-t-0">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Your field</h2>
-          {point ? (
-            <dl className="mt-3 grid grid-cols-2 gap-3">
-              <div className="rounded-lg bg-zinc-50 p-3">
-                <dt className="text-xs text-zinc-500">Latitude</dt>
-                <dd className="font-mono text-lg tabular-nums" data-testid="lat">{point.lat.toFixed(2)}</dd>
-              </div>
-              <div className="rounded-lg bg-zinc-50 p-3">
-                <dt className="text-xs text-zinc-500">Longitude</dt>
-                <dd className="font-mono text-lg tabular-nums" data-testid="lon">{point.lon.toFixed(2)}</dd>
-              </div>
-            </dl>
-          ) : (
-            <p className="mt-3 text-sm text-zinc-600">Click the map to drop a pin on your field.</p>
-          )}
+          {/* Pinned while the panel scrolls (desktop). Sticky stops at the aside's padding edge, so
+              -top-6 and the negative margins pull the band up over that padding: content slides
+              under a solid band instead of showing through above it */}
+          <div className="lg:sticky lg:-top-6 lg:z-10 lg:-mx-6 lg:-mt-6 lg:border-b lg:border-zinc-200 lg:bg-white lg:px-6 lg:pb-4 lg:pt-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Your field</h2>
+            {point ? (
+              <dl className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <dt className="text-xs text-zinc-500">Latitude</dt>
+                  <dd className="font-mono text-lg tabular-nums" data-testid="lat">{point.lat.toFixed(2)}</dd>
+                </div>
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <dt className="text-xs text-zinc-500">Longitude</dt>
+                  <dd className="font-mono text-lg tabular-nums" data-testid="lon">{point.lon.toFixed(2)}</dd>
+                </div>
+              </dl>
+            ) : (
+              <p className="mt-3 text-sm text-zinc-600">Click the map to drop a pin on your field.</p>
+            )}
+          </div>
           {demo && demo.sites.length > 0 && (
             <div className="mt-3 text-sm">
               <p className="text-zinc-600">

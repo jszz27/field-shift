@@ -68,6 +68,7 @@ class SoilInput(BaseModel):
     texture_class: str
     awc_mm_per_m: float | None = None
     organic_matter_pct: float | None = None
+    drainage: str | None = None  # SSURGO drainage class; alfalfa is excluded on poorly drained soil
     source: str | None = None
 
     def profile(self):

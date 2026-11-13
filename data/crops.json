@@ -104,8 +104,9 @@
       "heat_note": "Hay crop: no grain-set stage, so a reproductive failure temperature does not apply.",
       "n_effect": "fixes", "n_season": null,
       "residue_cover": "high",
-      "soil_preferences": {"prefer": null, "avoid_textures": [], "needs_good_drainage": true, "ph": [6.5, 7.0]},
-      "soil_note": "UMN: prefers well-drained, deep soils; keeping pH between 6.5 and 7.0 is extremely important.",
+      "soil_preferences": {"prefer": null, "avoid_textures": [], "needs_good_drainage": true, "ph": [6.5, 7.0],
+                           "exclude_if_drainage": ["Poorly drained", "Very poorly drained"]},
+      "soil_note": "UMN: prefers well-drained, deep soils; keeping pH between 6.5 and 7.0 is extremely important. Excluded on poorly drained soils: a multi-year stand there suffers root rot and frost heaving. Maize and soybean keep only needs_good_drainage, since poorly drained Corn Belt soils are mostly tile-drained row-crop land.",
       "sources": {"family": "botany", "stand_years": "plan_4_2", "kc": "fao56_t12", "rooting_depth_m": "fao56_t22", "depletion_p": "fao56_t22", "ky": "fao33_ky", "n_effect": "botany", "residue_cover": "nrcs_mi_329", "soil_preferences": "umn_alfalfa"}
     },
     "sorghum": {

@@ -86,9 +86,35 @@ def test_recommend(client):
     body = client.post("/api/recommend", json={**AMES, "baseline": ["maize"]}).json()
     assert body["pack"] == "us_midwest"
     finals = [r["final"] for r in body["rotations"]]
-    assert len(finals) == 5 and finals == sorted(finals, reverse=True)
+    assert 2 <= len(finals) <= 5 and finals == sorted(finals, reverse=True)
     assert all(2 <= len(r["reasons"]) <= 4 for r in body["rotations"])
     assert body["baseline"]["label"] == "continuous maize" and body["baseline"]["final"] == 46.1
+
+
+def test_recommendations_show_one_rotation_per_crop_set(client):
+    body = client.post("/api/recommend", json={**AMES, "baseline": ["maize"]}).json()
+    crop_sets = [frozenset(r["rotation"]) for r in body["rotations"]]
+    assert len(crop_sets) == len(set(crop_sets))                  # no 2-year vs 3-year alfalfa twins
+    assert ["maize", "soybean"] in [r["rotation"] for r in body["rotations"]]   # corn-soybean now surfaces
+
+
+def test_alfalfa_is_excluded_on_poorly_drained_soil(client):
+    soil = {"texture_class": "silty clay loam", "awc_mm_per_m": 141, "drainage": "Poorly drained"}
+    body = client.post("/api/recommend", json={**AMES, "baseline": ["maize"], "soil": soil}).json()
+    assert body["rotations"] and not any("alfalfa" in r["rotation"] for r in body["rotations"])
+    swap = client.post("/api/score", json={**AMES, "baseline": ["maize"], "soil": soil,
+                                           "rotation": ["alfalfa", "alfalfa", "maize"]}).json()
+    assert swap["rank"] is None
+    assert swap["rotation"]["rule_breaks"] == ["soil: Alfalfa (hay) does not suit poorly drained soil"]
+
+
+def test_adding_hay_to_a_grain_farm_costs_simplicity(client):
+    body = client.post("/api/recommend", json={**AMES, "baseline": ["maize"]}).json()
+    hay = next(r for r in body["rotations"] if "alfalfa" in r["rotation"])
+    assert hay["metrics"]["simplicity"] == len(set(hay["rotation"])) + 1 + 2   # +1 equipment, +2 new to the farm
+    with_hay = client.post("/api/recommend", json={**AMES, "baseline": ["alfalfa", "alfalfa", "maize"]}).json()
+    hay = next(r for r in with_hay["rotations"] if "alfalfa" in r["rotation"])
+    assert hay["metrics"]["simplicity"] == len(set(hay["rotation"])) + 1        # already grows hay: no transition cost
 
 
 def test_reasons_skip_et0_change_the_climate_card_calls_small(client):
@@ -103,7 +129,7 @@ def test_reasons_skip_et0_change_the_climate_card_calls_small(client):
 def test_data_gaps_drop_a_measure_instead_of_leaving_one_rotation(client):
     # Sorghum has a sourced residue class but most partner crops do not: soil cover would leave 1 rotation
     body = client.post("/api/recommend", json={**NIAMEY, "baseline": ["sorghum"]}).json()
-    assert len(body["rotations"]) == 5 and "soil_cover" not in body["ranked_on"]
+    assert body["n_comparable"] >= 5 and len(body["rotations"]) >= 2 and "soil_cover" not in body["ranked_on"]
     assert "water_demand" in body["ranked_on"]
 
 
