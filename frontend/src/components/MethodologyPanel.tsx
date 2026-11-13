@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   api, type MethodologyResponse, type ScoredRotation, type SoilProfile, type SourcedValue, type Weights,
 } from "@/lib/api";
+import { ordinal, PRIORITIES, type Priority } from "@/lib/priorities";
 
 const ORDER = ["n_balance", "soil_cover", "diversity", "water_demand", "climate_risk", "simplicity"];
 
@@ -25,9 +26,14 @@ const FIELD_LABELS: Record<string, string> = {
   family: "Plant family", type: "Type",
 };
 
-const WEIGHT_LABELS: Record<keyof Weights, string> = {
-  soil_health: "Soil health", water: "Water conservation", stability: "Yield stability", simplicity: "Simplicity",
-};
+// "1st Soil health (52%) · 2nd Water conservation (27%) · …", then the priorities left out
+function priorityLine(weights: Weights) {
+  const keys = (Object.keys(PRIORITIES) as Priority[]).sort((a, b) => weights[b] - weights[a]);
+  const ranked = keys.filter((k) => weights[k] > 0).map((k, i) =>
+    `${ordinal(i + 1)} ${PRIORITIES[k].label} (${Math.round(weights[k] * 100)}%)`);
+  const skipped = keys.filter((k) => !(weights[k] > 0)).map((k) => PRIORITIES[k].label);
+  return ranked.join(" · ") + (skipped.length ? `. Doesn’t matter: ${skipped.join(", ")}` : "");
+}
 
 function format(value: unknown): string {
   if (value == null) return "not sourced";
@@ -196,7 +202,7 @@ export default function MethodologyPanel({ pack, zone, rotation, baseline, soil,
         <summary className="cursor-pointer font-medium">Final score: {rotation.final ?? "not ranked"}</summary>
         <p className="mt-2">{m.final}</p>
         <p className="mt-1 text-xs text-zinc-600">
-          Your weights: {(Object.keys(WEIGHT_LABELS) as (keyof Weights)[]).map((k) => `${WEIGHT_LABELS[k]} ${weights[k]}`).join(" · ")}
+          Your priorities: {priorityLine(weights)}
         </p>
       </details>
 

@@ -3,20 +3,16 @@
 import { useEffect, useState } from "react";
 import {
   api, type Crop, type CropsResponse, type Point, type RecommendRequest, type RecommendResponse, type SoilInput,
-  type SoilResponse, type Weights,
+  type SoilResponse,
 } from "@/lib/api";
+import { DEFAULT_RANKING, ordinal, PRIORITIES, rocWeights, type Priority } from "@/lib/priorities";
 
 // What the results view needs to show rankings and re-score user edits
 export type Recommendation = { request: RecommendRequest; response: RecommendResponse; crops: Crop[] };
 
 const MAX_YEARS = 5;
 
-const SLIDERS: { key: keyof Weights; label: string; hint: string }[] = [
-  { key: "soil_health", label: "Soil health", hint: "Nitrogen, soil cover, crop variety" },
-  { key: "water", label: "Water conservation", hint: "Irrigation gap" },
-  { key: "stability", label: "Yield stability", hint: "Drought and heat risk" },
-  { key: "simplicity", label: "Simplicity", hint: "Fewer crops and machines" },
-];
+const ARROW_BUTTON = "rounded-md border border-zinc-300 px-2 py-1 text-zinc-600 hover:bg-zinc-100 disabled:opacity-30";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -40,7 +36,9 @@ export default function InputsPanel({ point, onResult }: Props) {
   const [crops, setCrops] = useState<CropsResponse | null>(null);
   const [cropsError, setCropsError] = useState<string | null>(null);
   const [baseline, setBaseline] = useState<string[]>([]);
-  const [weights, setWeights] = useState<Weights>({ soil_health: 50, water: 50, stability: 50, simplicity: 50 });
+  const [ranked, setRanked] = useState<Priority[]>(DEFAULT_RANKING);  // most important first
+  const weights = rocWeights(ranked);
+  const skipped = DEFAULT_RANKING.filter((p) => !ranked.includes(p));
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -166,23 +164,58 @@ export default function InputsPanel({ point, onResult }: Props) {
       </Section>
 
       <Section title="Your priorities">
-        <div className="flex flex-col gap-3">
-          {SLIDERS.map(({ key, label, hint }) => (
-            <label key={key} className="block text-sm">
-              <span className="flex justify-between">
-                <span className="font-medium">{label}</span>
-                <span className="tabular-nums text-zinc-600">{weights[key]}</span>
-              </span>
-              <input
-                type="range" min={0} max={100} step={5}
-                className="w-full accent-green-700"
-                value={weights[key]}
-                onChange={(e) => setWeights((w) => ({ ...w, [key]: Number(e.target.value) }))}
-              />
-              <span className="text-xs text-zinc-500">{hint}</span>
-            </label>
-          ))}
-        </div>
+        <p className="text-xs text-zinc-500">Put what matters most at the top. ✕ = doesn&apos;t matter to me.</p>
+        <ol className="mt-2 flex flex-col gap-2">
+          {ranked.map((p, i) => {
+            const { label, hint } = PRIORITIES[p];
+            return (
+              <li key={p} className="flex items-center gap-2 rounded-lg border border-zinc-200 p-2 text-sm">
+                <span className="w-9 shrink-0 text-center font-semibold text-green-800">{ordinal(i + 1)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{label}</span>
+                  <span className="ml-1 tabular-nums text-zinc-500">{Math.round(weights[p] * 100)}%</span>
+                  <span className="block text-xs text-zinc-500">{hint}</span>
+                </span>
+                <button
+                  type="button" className={ARROW_BUTTON} aria-label={`Move ${label} up`} disabled={i === 0}
+                  onClick={() => setRanked((r) => r.map((x, j) => (j === i - 1 ? p : j === i ? r[i - 1] : x)))}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button" className={ARROW_BUTTON} aria-label={`Move ${label} down`} disabled={i === ranked.length - 1}
+                  onClick={() => setRanked((r) => r.map((x, j) => (j === i + 1 ? p : j === i ? r[i + 1] : x)))}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button" className={ARROW_BUTTON} aria-label={`${label} doesn't matter to me`}
+                  title="Doesn't matter to me" disabled={ranked.length === 1}
+                  onClick={() => setRanked((r) => r.filter((x) => x !== p))}
+                >
+                  ✕
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+        {skipped.length > 0 && (
+          <div className="mt-2 text-sm text-zinc-600">
+            Doesn&apos;t matter to me:
+            <ul className="mt-1 flex flex-wrap gap-2">
+              {skipped.map((p) => (
+                <li key={p}>
+                  <button
+                    type="button" className="rounded-md border border-dashed border-zinc-300 px-2 py-1 hover:border-green-700"
+                    aria-label={`Add ${PRIORITIES[p].label} back`} onClick={() => setRanked((r) => [...r, p])}
+                  >
+                    {PRIORITIES[p].label} <span className="text-green-700">+ Add back</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Section>
 
       <button

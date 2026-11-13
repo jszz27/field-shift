@@ -104,8 +104,10 @@ METHODOLOGY = {
 FINAL_FORMULA = (
     "Each measure is scaled 0-100 within the rotations compared: 100 x (value - worst) / (best - worst), so 100 is the "
     "best in the set. Group scores: Soil health = mean of nitrogen, soil cover and diversity; Water conservation = water "
-    "demand; Yield stability = climate risk; Simplicity = simplicity. Final = sum of (slider weight x group score) / sum "
-    "of weights, using only the measures that can also be scored for your current practice. If missing crop data "
+    "demand; Yield stability = climate risk; Simplicity = simplicity. Final = sum of (priority weight x group score) / "
+    "sum of weights, using only the measures that can also be scored for your current practice. Priority weights come "
+    "from your ranking by the rank-order centroid method (Barron & Barrett 1996): 52%, 27%, 15% and 6% when all four "
+    "are ranked; a priority marked “doesn’t matter” gets 0. If missing crop data "
     "would leave fewer than 5 rotations comparable, the measure the fewest rotations have is left out of the ranking."
 )
 # Location data the indicators read (crop values cite crops.json sources instead)
