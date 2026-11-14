@@ -28,8 +28,7 @@ different rotation would perform.
 private browser window.]
 
 ## Link to Final Project
-https://field-shift-pi.vercel.app
-[If the repo is made public, add: https://github.com/jszz27/field-shift]
+https://field-shift-pi.vercel.app (live app) · Code: https://github.com/jszz27/field-shift
 
 ## Detailed Project Description
 **What it does.** Field Shift turns NASA Earth-observation data into a field-level crop rotation
