@@ -24,8 +24,7 @@ declining soil health, but rarely get field-level evidence of how their conditio
 different rotation would perform.
 
 ## Link to Project Demo
-[Public Google Drive link to the 7-slide PDF: Share → "Anyone with the link" → Viewer. Test it in a
-private browser window.]
+https://github.com/jszz27/field-shift/blob/main/docs/Field-Shift-GO-BANANA.pdf
 
 ## Link to Final Project
 https://field-shift-pi.vercel.app (live app) · Code: https://github.com/jszz27/field-shift
