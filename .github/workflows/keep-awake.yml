@@ -1,0 +1,21 @@
+# Keep the free Render API awake for judges and testers. Render sleeps a free service after
+# ~15 min without traffic (the next visit then waits ~1 min); this pings it every 10 min.
+# GitHub may start scheduled runs a few minutes late, and pauses schedules after 60 days
+# with no commits: re-enable it under Actions if that happens.
+name: Keep API awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:  # "Run workflow" button for a manual check
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping the Field Shift API
+        run: |
+          curl --fail --silent --show-error --max-time 120 --retry 3 --retry-delay 20 \
+            https://field-shift-api-9g2o.onrender.com/api/demo-sites -o /dev/null \
+            -w "HTTP %{http_code} in %{time_total}s\n"
