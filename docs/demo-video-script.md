@@ -13,8 +13,8 @@ or Google Drive with a public link (no sign-in) and test the link in a private w
 
 | Time | On screen | Narration |
 |---|---|---|
-| 0:00–0:02 | Deck cover slide (team name visible) | "Hi, we're [Team name]." |
-| 0:02–0:05 | Deck problem slide | "Our challenge: [challenge title]. Farmers plan crops on yesterday's climate." |
+| 0:00–0:02 | Deck cover slide (team name visible) | "Hi, we're GO BANANA." |
+| 0:02–0:05 | Deck problem slide | "Our challenge: Adapting Farms with NASA Data. Farmers plan crops on yesterday's climate." |
 | 0:05–0:10 | App, empty world map, title bar "Field Shift" | "Field Shift gives them crop rotations for the climate their field has *now*." |
 | 0:10–0:20 | Click **Ames, Iowa, USA** → climate cards; hover **First fall frost: Oct 10 → Oct 19**. Cut to the results: #1 card, **71.6 vs 22.9**. | "Drop a pin: 44 years of NASA weather show your field's shift. Here, frost comes nine days later. Rank what matters; get rotations with reasons." |
 | 0:20–0:30 | Quick cut: Niamey climate cards, then the deck's last slide with the link | "Any field on Earth, every number cited, for farms ready for the climate ahead." |
