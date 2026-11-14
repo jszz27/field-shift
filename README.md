@@ -102,3 +102,9 @@ Built for the NASA Space Apps Challenge 2026. Map data © OpenStreetMap contribu
 from Natural Earth via [world-atlas](https://github.com/topojson/world-atlas). NASA POWER data is from
 the NASA Langley Research Center POWER Project, funded through the NASA Earth Science Directorate
 Applied Science Program. Full source list: in the app, open "How each score is computed" → Sources.
+
+## License
+
+Code: [MIT](LICENSE). The data the app downloads (NASA POWER, EONET, SSURGO, SoilGrids, OpenStreetMap)
+stays under its providers' own terms; the cited crop values in `data/crops.json` come from the sources
+named there.
